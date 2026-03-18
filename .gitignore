@@ -1,0 +1,16 @@
+# Ambiente Virtual
+.venv/
+venv/
+env/
+
+# Dados (Segurança PMDF)
+data/*.xlsx
+data/*.csv
+!data/.gitkeep
+
+# Mac OS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc

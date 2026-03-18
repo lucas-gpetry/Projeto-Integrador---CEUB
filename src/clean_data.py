@@ -21,9 +21,7 @@ def limpar_historico(texto):
 
 def processar_base_completa():
     nome_arquivo = "base_original_pmdf.xlsx" 
-    
-    # O jeito mais seguro e elegante (funciona em Windows, Mac e Linux):
-    base_dir = os.getcwd() # Pega a pasta onde você deu o comando 'python main.py'
+    base_dir = os.getcwd()
     caminho_bruto = os.path.join(base_dir, "data", nome_arquivo)
     caminho_saida = os.path.join(base_dir, "data", "base_limpa.csv")
 
@@ -36,7 +34,10 @@ def processar_base_completa():
     print("\nExtraindo componentes de data/hora...")
     df = extracao_datetime(df, "data hora")
 
-    # 4. Limpeza de Texto (Sua parte principal)
+    #4. Normalizar texto
+    print("Limpando campo de histórico...")
+    coluna_texto = "historico"
+    df["historico_limpo"] = df[coluna_texto].apply(limpar_historico)
 
     # 5. Salvar resultado
     df.to_csv(caminho_saida, index=False, encoding='utf-8')
