@@ -5,7 +5,7 @@ from tqdm import tqdm
 from src.utils.nlp_engines import extrair_flags_regex, extrair_tipos_spacy, extrair_flags_adicionais
 
 def realizar_analise():
-    caminho_in = os.path.join("data", "base_limpa.csv")
+    caminho_in = os.path.join("data", "base_espacial.csv")
     caminho_out = os.path.join("data", "base_analisada.csv")
 
     if not os.path.exists(caminho_in):

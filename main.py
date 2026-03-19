@@ -1,6 +1,7 @@
 import time
 import os
 from src.clean_data import processar_base_completa
+from src.geo_analysis import processar_geoespacial # <-- Sua importação aqui
 from src.analysis import realizar_analise
 
 def run():
@@ -8,21 +9,25 @@ def run():
     print("PROJETO PMDF - ANÁLISE MARIA DA PENHA")
     print("="*50)
     
-    # Início do cronômetro global
     inicio_total = time.time()
 
     try:
-        # ETAPA 1: Limpeza e Processamento Inicial
-        print("\n[1/2] Iniciando Limpeza e Engenharia de Dados...")
+        # ETAPA 1: Limpeza e Processamento Inicial 
+        print("\n[1/3] Iniciando Limpeza e Extração de Datas...")
         processar_base_completa()
         
         print("-" * 30)
 
-        # ETAPA 2: Análise com spaCy + Regex
-        print("[2/2] Aplicando inteligência NLP e calculando Score...")
+        # ETAPA 2: Análise Geoespacial e Atributos 
+        print("[2/3] Aplicando Engenharia Geoespacial (Turnos, Moradia e Grade)...")
+        processar_geoespacial()
+
+        print("-" * 30)
+
+        # ETAPA 3: Análise com spaCy + Regex 
+        print("[3/3] Aplicando inteligência NLP e calculando Score...")
         realizar_analise()
 
-        # Cálculo do tempo final
         fim_total = time.time()
         tempo_total = (fim_total - inicio_total) / 60
         
