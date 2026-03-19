@@ -44,14 +44,13 @@ def realizar_analise():
     df = pd.concat([df, df_analisado], axis=1)
 
     # --- CÁLCULO DO SCORE DE RISCO (Exemplo)
-    df['score_risco'] = (
-        df['flag_arma_fogo'].astype(int) * 3 +
-        df['flag_medida_protetiva'].astype(int) * 3 +
-        df['flag_saida_temporaria'].astype(int) * 2 +
-        df['flag_separacao'].astype(int) * 2 +
-        df['v_fisica'].astype(int) * 2 +
-        df['flag_alcool'].astype(int) * 1
-    )
+    #df['score_risco'] = (
+        #df['flag_arma_fogo'].astype(int) * 3 +
+        #df['flag_medida_protetiva'].astype(int) * 3 +
+        #df['flag_separacao'].astype(int) * 2 +
+        #df['v_fisica'].astype(int) * 2 +
+        #df['flag_alcool'].astype(int) * 1
+    #)
 
     df.to_csv(caminho_out, index=False)
     print(f"Análise concluída. Base salva com {df.shape[1]} colunas.")
