@@ -3,21 +3,24 @@ import spacy
 
 # Dicionários de padrões
 REGEX_PATTERNS = {
-    'flag_alcool': r'\b(alc[oo]l|embriag\w*|bebeu|bebida|cerveja|cacha[çc]a|vinho|vodka|pinga)\b',
+    'flag_alcool': r'\b(alc[oo]l|embriag\w*|bebeu|bebida|cerveja|cacha[çc]a|vinho|vodka|pinga|beber)\b',
     'flag_drogas': r'\b(droga|entorpecente|maconha|crack|coca[ií]na|pino|lan[çc]a)\b',
     'flag_arma_fogo': r'\b(arma de fogo|rev[oó]lver|pistola|garrucha|tiro|disparo|fuzil)\b',
     'flag_arma_branca': r'\b(faca|canivete|tesoura|estilete|fac[ãa]o|punhal)\b',
     'flag_tornozeleira': r'\b(tornozeleira|monitoramento eletr[oô]nico)\b',
-    'flag_medida_protetiva': r'\b(medida protetiva|m\.p\.|protetiva|descumprimento)\b',
-    'flag_saida_temporaria': r'\b(saidinha|said[ãa]o|vpt|visita peri[óo]dica|sa[íi]da tempor[áa]ria|alvar[áa])\b'
+    'flag_medida_protetiva': r'\b(medida protetiva|m\.p\.|protetiva|descumprimento de medida)\b'
 }
 
 LEMAS_VIOLENCIA = {
     "v_fisica": {"agredir", "bater", "chutar", "empurrar", "soco", "chute", "lesao", "tapa", "espancar", "puxao"},
-    "v_psicologica": {"ameaçar", "humilhar", "xingar", "proibir", "isolar", "perseguir", "medo", "gritar"},
-    "v_patrimonial": {"quebrar", "rasgar", "subtrair", "destruir", "celular", "cartao", "dinheiro", "carteira"},
+    "v_psicologica": {"ameaçar", "humilhar", "xingar", "proibir", "isolar", "perseguir", "medo", "gritar", "importunar", "importunacao"},
+    "v_patrimonial": {"quebrar", "rasgar", "subtrair", "destruir", "danificar", "arrombar", "incendiar", "queimar",
+                        "tomar", "furtar", "roubar", "extorquir", "estragar", "celular", "aparelho", "veiculo", "carro",
+                        "moto", "moveis", "televisao", "tv", "vidro", "portao", "janela", "porta", "dinheiro", "cartao", "carteira"},
     "v_sexual": {"estuprar", "estupro", "sexo", "libidinoso", "vulneravel", "toque"},
-    "v_moral": {"caluniar", "difamar", "injuriar", "honra", "mentira", "fofoca"},
+    "v_moral": {
+        "caluniar", "difamar", "injuriar", "honra", "fofoca", "reputacao", "boato", "ofender", "ofensa", "xingar", "palavrao", "difamacao", "injuria", "calunia"
+    },
 
 }
 
@@ -81,33 +84,69 @@ def extrair_flags_regex(texto):
 
 def extrair_tipos_spacy(doc):
     """
-    Versão com desambiguação de 'sexo'e 'importunação'
+    Versão com desambiguação e filtro de improcedência.
     """
     resultados = {key: False for key in LEMAS_VIOLENCIA.keys()}
+    texto_bruto = doc.text.lower()
+    termos_improcedencia = ["nada constatado", "nada foi constatado", "negativo quanto", "ausencia de indicios", "nao houve constatacao"]
+    if any(termo in texto_bruto for termo in termos_improcedencia):
+        return resultados
 
     for token in doc:
         lema = token.lemma_
-        
         for categoria, termos in LEMAS_VIOLENCIA.items():
             if lema in termos:
                 
-                # 1. Filtro de Negação
+                # 1. Filtro de Negação Local
                 tem_negacao = any(child.dep_ == "neg" for child in token.children) or \
                               any(child.dep_ == "neg" for child in token.head.children)
                 if tem_negacao: continue
 
-                # 2. FILTRO DE GÊNERO (O problema do 'sexo feminino/masculino')
+                # 2. Filtro de Gênero
                 if lema == "sexo":
                     vizinhos_genero = [child.lemma_ for child in token.children]
-                    if "feminino" in vizinhos_genero or "masculino" in vizinhos_genero:
-                        continue # Ignora, pois é descrição de gênero, não ato sexual
+                    if any(g in vizinhos_genero for g in ["feminino", "masculino", "fem", "masc"]):
+                        continue 
                 
-                # 3. Tratamento de Importunação (que já tínhamos)
+                # Refinamento de Violência Patrimonial
+                if categoria == "v_patrimonial":
+                    if lema == "quebrar":
+                        vizinhos = [c.lemma_ for c in token.children] + [token.head.lemma_]
+                        termos_juridicos = ["medida", "decisao", "judicial", "protetiva", "regra", "ordem"]
+                        if any(v in termos_juridicos for v in vizinhos):
+                            continue 
+
+                    if lema in ["celular", "dinheiro", "cartao", "carteira", "aparelho", "veiculo"]:
+                        texto_contexto = doc.text.lower()
+                        # Lista de verbos que indicam agressão ao patrimônio
+                        verbos_acao = ["quebrou", "quebrar", "danificou", "danificar", "tomou", "tomar", 
+                                       "subtraiu", "subtrair", "roubou", "roubar", "rasgou", "rasgar"]
+                        if not any(v in texto_contexto for v in verbos_acao):
+                            continue
+
+                # 3. Tratamento Inteligente de Importunação
                 if lema in ["importunar", "importunacao"]:
                     eh_sexual = any(c.lemma_ == "sexual" for c in token.children)
-                    if eh_sexual: resultados["v_sexual"] = True
-                    else: resultados["v_psicologica"] = True
+                    if eh_sexual: 
+                        resultados["v_sexual"] = True
+                    else: 
+                        resultados["v_psicologica"] = True
                     continue
+
+                if categoria == "v_moral":
+                    if lema == "mentira":
+                        texto_contexto = doc.text.lower()
+                        indicadores_crime = ["contou", "espalhou", "falou", "inventou"]
+                        negativas_autor = ["autor disse", "autor alegou", "ser mentira", "diz ser"]
+                        
+                        if any(n in texto_contexto for n in negativas_autor):
+                            continue
+                        if not any(i in texto_contexto for i in indicadores_crime):
+                            continue
+
+                    # 2. Refinamento de Ofensas/Xingamentos (Verifica se houve o ato de proferir)
+                    if lema in ["ofender", "ofensa", "xingar", "palavrao"]:
+                        vizinhos = [c.lemma_ for c in token.children] + [token.head.lemma_]
 
                 resultados[categoria] = True
     return resultados
