@@ -2,15 +2,20 @@ import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Polygon
 import numpy as np
-import folium # <-- Adicionado
+import folium 
 import os
 
 def processar_geoespacial():
+    """
+    Lê a base limpa, gera features de Turno e Moradia via Regex de endereços, 
+    corrige coordenadas e aplica o Spatial Join com a grade UTM de 500m.
+    Salva a base final e exporta o mapa interativo.
+    """
     base_dir = os.getcwd()
     caminho_in = os.path.join(base_dir, "data", "base_limpa.csv")
     caminho_out = os.path.join(base_dir, "data", "base_espacial.csv")
     caminho_grade = os.path.join(base_dir, "data", "grade_espacial_df_LIMPA.geojson")
-    docs_dir = os.path.join(base_dir, "docs") # <-- Nova pasta docs/
+    docs_dir = os.path.join(base_dir, "docs")
 
     # Cria a pasta docs/ se ela não existir
     os.makedirs(docs_dir, exist_ok=True)
