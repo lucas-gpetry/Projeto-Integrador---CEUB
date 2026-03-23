@@ -1,6 +1,7 @@
 import re
 import spacy
 
+# Este código define funções para estruturação da coluna textual na base de dados
 # Dicionários de padrões
 REGEX_PATTERNS = {
     'flag_alcool': r'\b(alc[oo]l|embriag\w*|bebeu|bebida|cerveja|cacha[çc]a|vinho|vodka|pinga|beber)\b',

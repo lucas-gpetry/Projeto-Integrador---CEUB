@@ -4,6 +4,7 @@ from src.utils.read_file import read_file
 from src.utils.extracao_datetime import extracao_datetime
 from unidecode import unidecode
 
+# Função para ler, limpar e padronizar os dados 
 def limpar_historico(texto):
     """Função para normalizar o texto do histórico policial."""
     if pd.isna(texto) or not isinstance(texto, str):

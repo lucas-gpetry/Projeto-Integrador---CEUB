@@ -25,7 +25,7 @@ def run():
         print("-" * 30)
 
         # ETAPA 3: Análise com spaCy + Regex 
-        print("[3/3] Aplicando inteligência NLP e calculando Score...")
+        print("[3/3] Aplicando NLP...")
         realizar_analise()
 
         fim_total = time.time()
