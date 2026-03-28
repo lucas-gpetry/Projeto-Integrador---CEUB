@@ -64,3 +64,6 @@ Variáveis criadas pela Frente de Análise Espacial para padronizar o "Onde" oco
 | Coluna | Tipo | Descrição |
 | :--- | :--- | :--- |
 | `desfecho` | Categórico | Ação tomada pela PMDF. Valores: `encaminhado_dp` (conduzido à delegacia), `resolvido_local` (acordo/orientação no local) ou `nao_identificado`. |
+### 5.3 Dados ausentes
+A coluna G, quadra tem 23% de dados ausentes, e a coluna H, complemento 8,13% de dados ausentes. 
+
