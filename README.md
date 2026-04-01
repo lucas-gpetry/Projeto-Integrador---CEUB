@@ -34,10 +34,10 @@ Contém funções auxiliares importadas pelos motores principais:
 * `report_theme.py`: Define o tema gráfico institucional utilizado em todas as visualizações produzidas pelo projeto.
 Este módulo configura parâmetros globais de estilo (principalmente via Matplotlib/Seaborn), garantindo identidade visual única e adequada para documentos formais.
 Inclui definições como:
-- paleta de cores padronizada;
-- tipografia e tamanhos de fonte;
-- estilos de grade (grid);
-- espaçamentos e margens;
+  - paleta de cores padronizada;
+  - tipografia e tamanhos de fonte;
+  - estilos de grade (grid);
+  - espaçamentos e margens;
 
 Este módulo abstrai a lógica de visualização, permitindo que os notebooks e scripts principais apenas forneçam os dados já processados, enquanto o próprio módulo controla:
 
