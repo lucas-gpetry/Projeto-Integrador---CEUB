@@ -1,0 +1,687 @@
+---
+title: "Relatório Analítico — Violência contra a Mulher"
+author: "Arthur Virgílio, Emanuela Araújo, Felipe Teodoro, José Carvalho, Lucas Petry"
+date: today
+
+format:
+  pdf:
+    toc: false
+    number-sections: true
+    geometry: margin=2.5cm
+    colorlinks: true
+    linkcolor: black
+    urlcolor: black
+    citecolor: black
+    output-dir: docs
+
+fontsize: 12pt
+linestretch: 1.2
+mainfont: "Times New Roman"
+
+execute:
+  echo: false
+  warning: false
+  message: false
+
+header-includes:
+  - \usepackage{fancyhdr}
+  - \pagestyle{fancy}
+  - \fancyhead[L]{Relatório Analítico}
+  - \fancyhead[R]{Violência contra a Mulher}
+  - \fancyfoot[C]{\thepage}
+  - \usepackage{titling}
+  - \preauthor{\begin{center}\large}
+  - \postauthor{\end{center}}
+---
+# Sumário Executivo
+* Visão geral
+* Diferentes tipos de violência
+* Fatores associados
+* Alcoolismo?
+* Descumprimento de medida protetiva
+* Casos de reincidência
+* Insights
+
+
+
+# Introdução
+Este relatório consolida os insights extraídos a partir da base de ocorrências da Lei Maria da Penha registrados pela PMDF em 2025. O objetivo desta análise é identificar padrões e contextos
+
+# Visão Geral
+Essa análise leva em consideração 12.123 ocorrências associadas à Lei Maria da Penha. Os dados são referentes ao ano de 2024
+
+**De maneira geral, as ocorrências estão bem distribuídas ao longo dos meses, o que sugere que datas comemorativas não são um fator determinante para que a violência aconteça**
+```{python}
+from utils.report_theme import set_report_theme
+from utils.report_plots import *
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# TEMA GLOBAL DO RELATÓRIO ANALÍTICO
+import matplotlib.pyplot as plt
+import seaborn as sns
+COLORS = set_report_theme()
+
+df = pd.read_csv('../data/base_analisada.csv', sep=None, engine='python', encoding='utf-8')
+```
+```{python}
+# PREPARAÇÃO DOS DADOS
+df_ocorrencias = df.copy()
+
+# cria coluna Ano-Mês usando campos já existentes
+df_ocorrencias["ano_mes"] = (
+    df_ocorrencias["ano"].astype(str)
+    + "-"
+    + df_ocorrencias["mes"].astype(str).str.zfill(2)
+)
+
+# AGREGAÇÃO
+df_plot = (
+    df_ocorrencias
+    .groupby("ano_mes")
+    .size()
+    .reset_index(name="quantidade")
+    .sort_values("ano_mes")
+)
+
+# PLOT PADRONIZADO
+bar_timeseries(
+    df=df_plot,
+    x="ano_mes",
+    y="quantidade",
+    title="Ocorrências registradas por mês",
+    COLORS=COLORS
+)
+```
+
+**Por outro lado, observa-se que, em relação aos dias da semana, 39.5% das ocorrências foram registradas durante o final de semana. Um possível motivo para é o maior tempo de convívio familiar nesses dias**
+```{python}
+# PREPARAÇÃO DOS DADOS
+df_semana = df.copy()
+
+# cria coluna datetime apenas para cálculo
+# cria coluna datetime apenas para cálculo
+df_semana["data"] = pd.to_datetime(
+    dict(
+        year=df_semana["ano"],
+        month=df_semana["mes"],
+        day=df_semana["dia"]
+    ),
+    errors="coerce"
+)
+
+# nomes dos dias em português
+dias_semana = {
+    0: "Segunda-feira",
+    1: "Terça-feira",
+    2: "Quarta-feira",
+    3: "Quinta-feira",
+    4: "Sexta-feira",
+    5: "Sábado",
+    6: "Domingo"
+}
+
+df_semana["dia_semana"] = (
+    df_semana["data"]
+    .dt.weekday
+    .map(dias_semana)
+)
+
+
+# AGREGAÇÃO
+df_plot = (
+    df_semana
+    .groupby("dia_semana")
+    .size()
+    .reset_index(name="quantidade")
+)
+
+# ordem lógica dos dias
+ordem_dias = list(dias_semana.values())
+
+df_plot["dia_semana"] = pd.Categorical(
+    df_plot["dia_semana"],
+    categories=ordem_dias,
+    ordered=True
+)
+
+df_plot = df_plot.sort_values("dia_semana")
+
+# PLOT PADRONIZADO
+bar_vertical_temporal_highlight(
+    df=df_plot,
+    x="dia_semana",
+    y="quantidade",
+    title="Ocorrências por dia da semana",
+    COLORS=COLORS
+)
+```
+
+**Nessa esteira, o horário das ocorrências também corresponde ao provável período de convívio entre a vítima e o agressor. As ocorrências durante a madrugada também estão associadas ao consumo de álcool**
+
+```{python}
+# PREPARAÇÃO DOS DADOS
+df_hora = df.copy()
+
+# garante tipo numérico
+df_hora["hora"] = pd.to_numeric(df_hora["hora"], errors="coerce")
+
+df_hora = df_hora.dropna(subset=["hora"])
+
+# AGREGAÇÃO
+df_plot = (
+    df_hora
+    .groupby("hora")
+    .size()
+    .reset_index(name="quantidade")
+    .sort_values("hora")
+)
+
+horas_completas = pd.DataFrame({"hora": range(24)})
+
+df_plot = (
+    horas_completas
+    .merge(df_plot, on="hora", how="left")
+    .fillna(0)
+)
+
+df_plot["quantidade"] = df_plot["quantidade"].astype(int)
+
+# PLOT PADRONIZADO
+
+line_chart(
+    df=df_plot,
+    x="hora",
+    y="quantidade",
+    title="Ocorrências por hora do dia",
+    COLORS=COLORS
+)
+```
+
+# Tipos de violência
+A violência contra a mulher pode ser classificada em 5 diferentes tipos:
+
+* Física 
+* Psicológica
+* Moral
+* Sexual
+* Patrimonial
+
+**Nas ocorrências analisadas, observa-se que mais de 70% dos casos envolvem violência física ou pastrimonial**
+
+Isso não significa que as outras categorias sejam menos frequentes, mas que podem ser subnotificadas (Provavelmente uma mulher não vai chamar a Polícia Militar devido a uma violência exclusivamente psicológica)
+```{python}
+
+# PREPARAÇÃO DOS DADOS
+df_violencia = df.copy()
+
+cols_violencia = [
+    "v_fisica",
+    "v_psicologica",
+    "v_patrimonial",
+    "v_sexual",
+    "v_moral"
+]
+
+# AGREGAÇÃO
+df_plot = (
+    df_violencia[cols_violencia]
+    .sum()
+    .reset_index()
+)
+
+df_plot.columns = ["tipo_violencia", "quantidade"]
+
+# nomes amigáveis para relatório
+map_labels = {
+    "v_fisica": "Violência Física",
+    "v_psicologica": "Violência Psicológica",
+    "v_patrimonial": "Violência Patrimonial",
+    "v_sexual": "Violência Sexual",
+    "v_moral": "Violência Moral"
+}
+
+df_plot["tipo_violencia"] = df_plot["tipo_violencia"].map(map_labels)
+
+# PLOT PADRONIZADO
+bar_horizontal_highlight(
+    df=df_plot,
+    x="tipo_violencia",
+    y="quantidade",
+    title="Tipos de violência mais frequentes nas ocorrências",
+    COLORS=COLORS
+)
+```
+
+Além disso, é possível e muito provável que haja coocorrências de diferentes tipos de violência no mesmo caso
+
+```{python}
+
+```
+# Fatores Associados
+**Mais de 30% das ocorrências estão associadas a algum fator externo como consumo de álcool ou drogas, descumprimento de medida protetiva ou término recente de relacionamento.**
+
+**Consumo de álcool ou descumprimento de medida protetiva são fatores presentes em cerca de 23% das ocorrências analisadas**
+```{python}
+def bar_horizontal_highlight(
+    df,
+    x,
+    y,
+    title,
+    COLORS
+):
+
+    from matplotlib.ticker import FuncFormatter
+
+    df_plot = df.sort_values(y, ascending=True)
+
+    colors = _highlight_colors(df_plot[y].values, COLORS)
+
+    plt.figure(figsize=(8, 5))
+
+    ax = plt.barh(
+        df_plot[x],
+        df_plot[y],
+        color=colors
+    )
+
+    plt.yticks(rotation=0)
+    plt.xticks(rotation=0)
+
+    _setup_axes(title, xlabel=y, ylabel=x)
+
+    # formata eixo em percentual brasileiro
+    plt.gca().xaxis.set_major_formatter(
+        FuncFormatter(lambda x, _: f"{x:.1f}%".replace(".", ","))
+    )
+
+    # labels nas barras já formatados
+    for container in plt.gca().containers:
+        labels = [
+            f"{v.get_width():.1f}%".replace(".", ",")
+            for v in container
+        ]
+        plt.bar_label(container, labels=labels, padding=3)
+
+    plt.tight_layout()
+    plt.show()
+```
+
+# Consumo de álcool
+Este é o fator associado mais representativo dentre os dados analisados. Cerca de 12% das ocorrências estão relacionadas ao consumo de álcool
+
+**Observa-se que há uma tendência à linearidade quanto ao total de casos registrados por dia da semana**
+Isso sugere que ocorrências nesse contexto não estão restritas a datas comemorativas ou finais de semana. Pelo contrário, a ausência de sazonalidade indica que o consumo de álcool por parte dos agressores é constante
+```{python}
+# ÁLCOOL — POR DIA DA SEMANA
+df_alcool = df.copy()
+
+# filtra apenas casos com álcool
+df_alcool = df_alcool[df_alcool["flag_alcool"] == True]
+
+# cria datetime
+df_alcool["data"] = pd.to_datetime(
+    dict(
+        year=df_alcool["ano"],
+        month=df_alcool["mes"],
+        day=df_alcool["dia"]
+    ),
+    errors="coerce"
+)
+
+dias_semana = {
+    0: "Segunda-feira",
+    1: "Terça-feira",
+    2: "Quarta-feira",
+    3: "Quinta-feira",
+    4: "Sexta-feira",
+    5: "Sábado",
+    6: "Domingo"
+}
+
+df_alcool["dia_semana"] = (
+    df_alcool["data"].dt.weekday.map(dias_semana)
+)
+
+df_plot_semana = (
+    df_alcool
+    .groupby("dia_semana")
+    .size()
+    .reset_index(name="quantidade")
+)
+
+ordem = list(dias_semana.values())
+
+df_plot_semana["dia_semana"] = pd.Categorical(
+    df_plot_semana["dia_semana"],
+    categories=ordem,
+    ordered=True
+)
+
+df_plot_semana = df_plot_semana.sort_values("dia_semana")
+
+bar_vertical_temporal_highlight(
+    df=df_plot_semana,
+    x="dia_semana",
+    y="quantidade",
+    title="Ocorrências com consumo de álcool por dia da semana",
+    COLORS=COLORS
+)
+
+# ======================================
+# ÁLCOOL — POR MÊS
+meses = {
+    1: "Jan",
+    2: "Fev",
+    3: "Mar",
+    4: "Abr",
+    5: "Mai",
+    6: "Jun",
+    7: "Jul",
+    8: "Ago",
+    9: "Set",
+    10: "Out",
+    11: "Nov",
+    12: "Dez"
+}
+
+df_plot_mes = (
+    df_alcool
+    .groupby("mes")
+    .size()
+    .reset_index(name="quantidade")
+)
+
+df_plot_mes["mes_nome"] = df_plot_mes["mes"].map(meses)
+
+df_plot_mes = df_plot_mes.sort_values("mes")
+
+bar_timeseries(
+    df=df_plot_mes,
+    x="mes_nome",
+    y="quantidade",
+    title="Ocorrências com consumo de álcool por mês",
+    COLORS=COLORS
+)
+```
+
+**Por outro lado, as ocorrências tendem a aumentar conforme a noite e a madrugada chegam**
+```{python}
+# ÁLCOOL — POR HORA DO DIA
+
+df_plot_hora = (
+    df_alcool
+    .groupby("hora")
+    .size()
+    .reset_index(name="quantidade")
+    .sort_values("hora")
+)
+
+line_chart(
+    df=df_plot_hora,
+    x="hora",
+    y="quantidade",
+    title="Ocorrências com consumo de álcool por hora do dia",
+    COLORS=COLORS
+)
+```
+
+# Descumprimento de medida protetiva
+Este é o segundo fator mais relevante nos dados analisados. Cerca de 11% das ocorrências envolviam o descumprimento de medida protetiva
+
+**Os descumprimentos de medida protetiva também ocorrerem, em sua maioria, aos fins de semana**
+```{python}
+# MEDIDA PROTETIVA — POR DIA DA SEMANA
+df_medida_protetiva = df.copy()
+
+# filtra apenas casos com medida protetiva ativa
+df_medida_protetiva = df_medida_protetiva[df_medida_protetiva["flag_medida_protetiva"] == True]
+
+# cria datetime
+df_medida_protetiva["data"] = pd.to_datetime(
+    dict(
+        year=df_medida_protetiva["ano"],
+        month=df_medida_protetiva["mes"],
+        day=df_medida_protetiva["dia"]
+    ),
+    errors="coerce"
+)
+
+dias_semana = {
+    0: "Segunda-feira",
+    1: "Terça-feira",
+    2: "Quarta-feira",
+    3: "Quinta-feira",
+    4: "Sexta-feira",
+    5: "Sábado",
+    6: "Domingo"
+}
+
+df_medida_protetiva["dia_semana"] = (
+    df_medida_protetiva["data"].dt.weekday.map(dias_semana)
+)
+
+df_plot_semana = (
+    df_medida_protetiva
+    .groupby("dia_semana")
+    .size()
+    .reset_index(name="quantidade")
+)
+
+ordem = list(dias_semana.values())
+
+df_plot_semana["dia_semana"] = pd.Categorical(
+    df_plot_semana["dia_semana"],
+    categories=ordem,
+    ordered=True
+)
+
+df_plot_semana = df_plot_semana.sort_values("dia_semana")
+
+bar_vertical_temporal_highlight(
+    df=df_plot_semana,
+    x="dia_semana",
+    y="quantidade",
+    title="Ocorrências com descumprimento de medida protetiva por dia da semana",
+    COLORS=COLORS
+)
+
+# ======================================
+# MEDIDA PROTETIVA — POR MÊS
+meses = {
+    1: "Jan",
+    2: "Fev",
+    3: "Mar",
+    4: "Abr",
+    5: "Mai",
+    6: "Jun",
+    7: "Jul",
+    8: "Ago",
+    9: "Set",
+    10: "Out",
+    11: "Nov",
+    12: "Dez"
+}
+
+df_plot_mes = (
+    df_medida_protetiva
+    .groupby("mes")
+    .size()
+    .reset_index(name="quantidade")
+)
+
+df_plot_mes["mes_nome"] = df_plot_mes["mes"].map(meses)
+
+df_plot_mes = df_plot_mes.sort_values("mes")
+
+bar_timeseries(
+    df=df_plot_mes,
+    x="mes_nome",
+    y="quantidade",
+    title="Ocorrências com descumprimento de medida protetiva por mês",
+    COLORS=COLORS
+)
+```
+
+**Além disso, o horário comercial também ganha destaque devido à quantidade de ocorrências registradas nesse período**
+
+```{python}
+# MEDIDA PROTETIVA — POR HORA DO DIA
+
+df_plot_hora = (
+    df_medida_protetiva
+    .groupby("hora")
+    .size()
+    .reset_index(name="quantidade")
+    .sort_values("hora")
+)
+
+line_chart(
+    df=df_plot_hora,
+    x="hora",
+    y="quantidade",
+    title="Ocorrências com descumprimento de medida protetiva por hora do dia",
+    COLORS=COLORS
+)
+```
+
+**Por outro lado, observa-se que a participação desse fator dentro do total de ocorrências diárias se comporta de maneira inversa à do consumo alcoólico**
+```{python}
+# ==============================
+# PREPARAÇÃO
+# ==============================
+
+df_semana = df.copy()
+# cria data válida
+df_semana["data"] = pd.to_datetime(
+    dict(
+        year=df_semana["ano"],
+        month=df_semana["mes"],
+        day=df_semana["dia"]
+    ),
+    errors="coerce"
+)
+
+# ==============================
+# DIA DA SEMANA (PT-BR)
+# ==============================
+
+dias_semana = {
+    0: "Segunda-feira",
+    1: "Terça-feira",
+    2: "Quarta-feira",
+    3: "Quinta-feira",
+    4: "Sexta-feira",
+    5: "Sábado",
+    6: "Domingo"
+}
+
+df_semana["dia_semana"] = (
+    df_semana["data"]
+    .dt.weekday
+    .map(dias_semana)
+)
+
+# ==============================
+# CÁLCULO DO PERCENTUAL
+# ==============================
+
+df_plot = (
+    df_semana
+    .groupby("dia_semana")["flag_alcool"]
+    .mean()                # ← proporção
+    .mul(100)              # ← percentual
+    .reset_index(name="percentual")
+)
+
+# ordem lógica dos dias
+ordem_dias = list(dias_semana.values())
+
+df_plot["dia_semana"] = pd.Categorical(
+    df_plot["dia_semana"],
+    categories=ordem_dias,
+    ordered=True
+)
+
+df_plot = df_plot.sort_values("dia_semana")
+
+# ==============================
+# PLOT
+# ==============================
+
+bar_vertical_temporal_highlight(
+    df=df_plot,
+    x="dia_semana",
+    y="percentual",
+    title="% de ocorrências com consumo de álcool por dia da semana",
+    COLORS=COLORS
+)
+
+# ==============================
+# PREPARAÇÃO
+# ==============================
+
+df_semana = df.copy()
+
+# cria data válida
+df_semana["data"] = pd.to_datetime(
+    dict(
+        year=df_semana["ano"],
+        month=df_semana["mes"],
+        day=df_semana["dia"]
+    ),
+    errors="coerce"
+)
+
+dias_semana = {
+    0: "Segunda-feira",
+    1: "Terça-feira",
+    2: "Quarta-feira",
+    3: "Quinta-feira",
+    4: "Sexta-feira",
+    5: "Sábado",
+    6: "Domingo"
+}
+
+df_semana["dia_semana"] = (
+    df_semana["data"]
+    .dt.weekday
+    .map(dias_semana)
+)
+
+df_plot = (
+    df_semana
+    .groupby("dia_semana")["flag_medida_protetiva"]
+    .mean()                # ← proporção
+    .mul(100)              # ← percentual
+    .reset_index(name="percentual")
+)
+
+# ordem lógica dos dias
+ordem_dias = list(dias_semana.values())
+
+df_plot["dia_semana"] = pd.Categorical(
+    df_plot["dia_semana"],
+    categories=ordem_dias,
+    ordered=True
+)
+
+df_plot = df_plot.sort_values("dia_semana")
+
+# PLOT
+
+bar_vertical_temporal_highlight(
+    df=df_plot,
+    x="dia_semana",
+    y="percentual",
+    title="% de ocorrências com descumprimento de medida protetiva por dia da semana",
+    COLORS=COLORS
+)
+```
+
+# Reincidência
+
+Encontrar maneira de localizar reincidências. Clusterizar as latitudes e longitudes e buscar por um raio de 30-50 metros é uma possibilidade para escapar das pequenas variações de GPS
+
