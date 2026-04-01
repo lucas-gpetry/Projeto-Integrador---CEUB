@@ -8,23 +8,20 @@ import os
 def processar_geoespacial():
     """
     Lê a base limpa, gera features de Turno e Moradia via Regex de endereços, 
-    corrige coordenadas e aplica o Spatial Join com a grade UTM de 500m.
-    Salva a base final e exporta o mapa interativo.
+    calcula reincidência, corrige coordenadas e aplica o Spatial Join com a grade UTM de 500m.
+    Salva a base final e exporta o mapa interativo com os Batalhões da PMDF.
     """
     base_dir = os.getcwd()
     caminho_in = os.path.join(base_dir, "data", "base_limpa.csv")
+    caminho_bat = os.path.join(base_dir, "data", "batalhoes_pmdf.csv") # Onde ficarão os batalhões
     caminho_out = os.path.join(base_dir, "data", "base_espacial.csv")
-    caminho_grade = os.path.join(base_dir, "data", "grade_espacial_df_LIMPA.geojson")
+    caminho_grade = os.path.join(base_dir, "data", "grade_espacial_df_LIMPA.geojson") 
     docs_dir = os.path.join(base_dir, "docs")
 
-    # Cria a pasta docs/ se ela não existir
     os.makedirs(docs_dir, exist_ok=True)
 
-    print(f"Lendo base limpa: {caminho_in}")
+    print("🚀 Lendo dados e corrigindo coordenadas...")
     df = pd.read_csv(caminho_in)
-
-    # --- CORREÇÃO DE VÍRGULAS NAS COORDENADAS ---
-    print("Ajustando formato das coordenadas para o mapa...")
     df['latitude'] = df['latitude'].astype(str).str.replace(',', '.').astype(float)
     df['longitude'] = df['longitude'].astype(str).str.replace(',', '.').astype(float)
 
@@ -49,9 +46,15 @@ def processar_geoespacial():
     labels = ['Madrugada', 'Manhã', 'Tarde', 'Noite']
     df['TURNO'] = pd.cut(df['hora'], bins=bins, labels=labels)
 
+    # --- 2. ANÁLISE DE REINCIDÊNCIA (Eixo 3) ---
+    print("Analisando reincidência por endereço...")
+    contagem_enderecos = df['ENDERECO_BUSCA'].value_counts()
+    df['reincidencia_endereco'] = df['ENDERECO_BUSCA'].map(contagem_enderecos)
+
+    # Limpando colunas temporárias
     df.drop(columns=['COMPLEMENTO_CLEAN', 'QUADRA_CLEAN', 'ENDERECO_BUSCA'], inplace=True)
 
-    # --- 2. CIRURGIA DE GPS E GRADE ESPACIAL ---
+    # --- 3. CIRURGIA DE GPS E GRADE ESPACIAL ---
     print("Realizando clusterização espacial (Grade 500m)...")
     
     # Criamos uma CÓPIA apenas para fazer a matemática espacial, sem destruir o df original de 12 mil linhas
@@ -89,18 +92,34 @@ def processar_geoespacial():
         grid_export = grid[grid['id_celula'].isin(df_final['id_celula'].dropna().unique())].to_crs("EPSG:4326")
         grid_export.to_file(caminho_grade, driver='GeoJSON')
         
-        print("Gerando mapa interativo...")
+        print("Gerando mapa interativo (Ocorrências vs Batalhões)...")
         contagem_grid = intersecao_unica.groupby('id_celula').size().reset_index(name='total_ocorrencias')
         grid_mapa = grid_export.merge(contagem_grid, on='id_celula')
 
         mapa_risco = folium.Map(location=[-15.793889, -47.882778], zoom_start=11, tiles='CartoDB dark_matter')
+        
+        # Camada 1: Mapa de Calor (Grade)
         folium.Choropleth(
             geo_data=grid_mapa, data=grid_mapa, columns=['id_celula', 'total_ocorrencias'],
             key_on='feature.properties.id_celula', fill_color='YlOrRd', fill_opacity=0.8, line_opacity=0.3,
             legend_name='Risco Real (Nº de Ocorrências)'
         ).add_to(mapa_risco)
         
-        caminho_mapa = os.path.join(docs_dir, "mapa_grade_preditiva.html")
+        # Camada 2: Batalhões da PMDF
+        if os.path.exists(caminho_bat):
+            df_bat = pd.read_csv(caminho_bat)
+            for _, bat in df_bat.iterrows():
+                # O parâmetro icon='shield' usa um ícone de escudo. A cor 'blue' contrasta com a grade vermelha.
+                folium.Marker(
+                    location=[bat['Latitude'], bat['Longitude']],
+                    popup=f"<b>{bat['Nome do Batalhão']}</b><br>{bat['Endereço']}",
+                    tooltip=bat['Nome do Batalhão'],
+                    icon=folium.Icon(color='blue', icon='shield', prefix='fa')
+                ).add_to(mapa_risco)
+        else:
+            print("⚠️ Arquivo de batalhões não encontrado. O mapa foi gerado sem eles.")
+        
+        caminho_mapa = os.path.join(docs_dir, "mapa_crime_vs_batalhoes.html")
         mapa_risco.save(caminho_mapa)
         print(f"🗺️ Mapa salvo em: {caminho_mapa}")
 
@@ -108,7 +127,7 @@ def processar_geoespacial():
         df_final = df
 
     # --- 4. SALVAR ---
-    # Salva a base preservando todas as 12 mil linhas
+    # Salva a base preservando todas as 12 mil linhas e a nova coluna 'reincidencia_endereco'
     df_final.to_csv(caminho_out, index=False, encoding='utf-8-sig')
     print(f"Base espacial salva em: {caminho_out} com {len(df_final)} linhas!")
 
