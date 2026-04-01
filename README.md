@@ -30,6 +30,16 @@ Contém funções auxiliares importadas pelos motores principais:
 * `extracao_datetime.py`: Módulo modular para desmembrar a coluna 'data hora' em componentes úteis para análise de séries temporais.
 * `nlp_engines.py`: Contém a lógica pesada do spaCy (lematização e análise de dependência sintática) para identificar menções a agressões e desambiguar falsos positivos (ex: "não houve agressão física").
 * `read_file.py`: Função segura para ignorar cabeçalhos/rodapés falsos durante a leitura do Excel original.
+* `report_plots.py`: Centraliza as funções responsáveis pela criação dos gráficos utilizados no relatório analítico, garantindo consistência visual e reutilização de código ao longo do projeto.
+* `report_theme.py`: Define o tema gráfico institucional utilizado em todas as visualizações produzidas pelo projeto.
+Este módulo configura parâmetros globais de estilo (principalmente via Matplotlib/Seaborn), garantindo identidade visual única e adequada para documentos formais.
+Inclui definições como:
+- paleta de cores padronizada;
+- tipografia e tamanhos de fonte;
+- estilos de grade (grid);
+- espaçamentos e margens;
+
+Este módulo abstrai a lógica de visualização, permitindo que os notebooks e scripts principais apenas forneçam os dados já processados, enquanto o próprio módulo controla:
 
 ### `data/` (Repositório de Dados)
 *Não versionado no Git por questões de LGPD e tamanho.*
