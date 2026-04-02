@@ -13,10 +13,11 @@ format:
     urlcolor: black
     citecolor: black
     output-dir: docs
+    mainfont: "Montserrat"
 
 fontsize: 12pt
 linestretch: 1.2
-mainfont: "Times New Roman"
+mainfont: "Montserrat"
 
 execute:
   echo: false
@@ -33,6 +34,10 @@ header-includes:
   - \preauthor{\begin{center}\large}
   - \postauthor{\end{center}}
 ---
+
+![](../docs/pmdf.png){fig-align="center"}
+
+\newpage
 # Sumário Executivo
 * Visão geral
 * Diferentes tipos de violência
@@ -41,8 +46,6 @@ header-includes:
 * Descumprimento de medida protetiva
 * Casos de reincidência
 * Insights
-
-
 
 # Introdução
 Este relatório consolida os insights extraídos a partir da base de ocorrências da Lei Maria da Penha registrados pela PMDF em 2025. O objetivo desta análise é identificar padrões e contextos
@@ -92,7 +95,8 @@ bar_timeseries(
     x="ano_mes",
     y="quantidade",
     title="Ocorrências registradas por mês",
-    COLORS=COLORS
+    COLORS=COLORS, 
+    xlabel = "Ano-Mês"
 )
 ```
 
@@ -155,7 +159,8 @@ bar_vertical_temporal_highlight(
     x="dia_semana",
     y="quantidade",
     title="Ocorrências por dia da semana",
-    COLORS=COLORS
+    COLORS=COLORS, 
+    xlabel = "Dia da Semana"
 )
 ```
 
@@ -196,7 +201,8 @@ line_chart(
     x="hora",
     y="quantidade",
     title="Ocorrências por hora do dia",
-    COLORS=COLORS
+    COLORS=COLORS, 
+    xlabel="Hora do dia"
 )
 ```
 
@@ -251,7 +257,8 @@ bar_horizontal_highlight(
     x="tipo_violencia",
     y="quantidade",
     title="Tipos de violência mais frequentes nas ocorrências",
-    COLORS=COLORS
+    COLORS=COLORS, 
+    ylabel = "Tipo de violência"
 )
 ```
 
@@ -373,18 +380,18 @@ bar_vertical_temporal_highlight(
 # ======================================
 # ÁLCOOL — POR MÊS
 meses = {
-    1: "Jan",
-    2: "Fev",
-    3: "Mar",
-    4: "Abr",
-    5: "Mai",
-    6: "Jun",
-    7: "Jul",
-    8: "Ago",
-    9: "Set",
-    10: "Out",
-    11: "Nov",
-    12: "Dez"
+    1: "Janeiro",
+    2: "Fevereiro",
+    3: "Março",
+    4: "Abril",
+    5: "Maio",
+    6: "Junho",
+    7: "Julho",
+    8: "Agosto",
+    9: "Setembro",
+    10: "Outubro",
+    11: "Novembro",
+    12: "Dezembro"
 }
 
 df_plot_mes = (
@@ -403,7 +410,8 @@ bar_timeseries(
     x="mes_nome",
     y="quantidade",
     title="Ocorrências com consumo de álcool por mês",
-    COLORS=COLORS
+    COLORS=COLORS, 
+    xlabel = "Mês"
 )
 ```
 
@@ -424,7 +432,8 @@ line_chart(
     x="hora",
     y="quantidade",
     title="Ocorrências com consumo de álcool por hora do dia",
-    COLORS=COLORS
+    COLORS=COLORS, 
+    xlabel = "Hora do dia"
 )
 ```
 
@@ -485,24 +494,25 @@ bar_vertical_temporal_highlight(
     x="dia_semana",
     y="quantidade",
     title="Ocorrências com descumprimento de medida protetiva por dia da semana",
-    COLORS=COLORS
+    COLORS=COLORS,
+    xlabel = "Dia da semana"
 )
 
 # ======================================
 # MEDIDA PROTETIVA — POR MÊS
 meses = {
-    1: "Jan",
-    2: "Fev",
-    3: "Mar",
-    4: "Abr",
-    5: "Mai",
-    6: "Jun",
-    7: "Jul",
-    8: "Ago",
-    9: "Set",
-    10: "Out",
-    11: "Nov",
-    12: "Dez"
+    1: "Janeiro",
+    2: "Fevereiro",
+    3: "Março",
+    4: "Abril",
+    5: "Maio",
+    6: "Junho",
+    7: "Julho",
+    8: "Agosto",
+    9: "Setembro",
+    10: "Outubro",
+    11: "Novembro",
+    12: "Dezembro"
 }
 
 df_plot_mes = (
@@ -521,7 +531,8 @@ bar_timeseries(
     x="mes_nome",
     y="quantidade",
     title="Ocorrências com descumprimento de medida protetiva por mês",
-    COLORS=COLORS
+    COLORS=COLORS, 
+    xlabel = "Mês"
 )
 ```
 
@@ -615,8 +626,9 @@ bar_vertical_temporal_highlight(
     df=df_plot,
     x="dia_semana",
     y="percentual",
-    title="% de ocorrências com consumo de álcool por dia da semana",
-    COLORS=COLORS
+    title="Percentual de ocorrências com consumo de álcool por dia da semana",
+    COLORS=COLORS,
+    xlabel = "Dia da semana"
 )
 
 # ==============================
@@ -676,8 +688,9 @@ bar_vertical_temporal_highlight(
     df=df_plot,
     x="dia_semana",
     y="percentual",
-    title="% de ocorrências com descumprimento de medida protetiva por dia da semana",
-    COLORS=COLORS
+    title="Percentual de ocorrências com descumprimento de medida protetiva por dia da semana",
+    COLORS=COLORS, 
+    xlabel = "Dia da semana"
 )
 ```
 

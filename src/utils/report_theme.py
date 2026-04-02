@@ -19,7 +19,7 @@ def set_report_theme():
     plt.rcParams.update({
 
         # Fonte
-        "font.family": "DejaVu Sans",
+        "font.family": "Montserrat",
         "font.size": 11,
 
         # Títulos

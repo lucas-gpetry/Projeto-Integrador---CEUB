@@ -9,7 +9,7 @@ import numpy as np
 
 def _setup_axes(title, xlabel, ylabel):
 
-    plt.title(title, loc="left", pad=15)
+    plt.title(title, loc="center", pad=15)
 
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
@@ -70,7 +70,10 @@ def bar_horizontal_highlight(
     x,
     y,
     title,
-    COLORS
+    COLORS,
+    xlabel=None,
+    ylabel=None,
+    label_offset=0.02  # controla distância do label (tipo hjust)
 ):
 
     df_plot = df.sort_values(y, ascending=True)
@@ -88,9 +91,34 @@ def bar_horizontal_highlight(
     plt.yticks(rotation=0)
     plt.xticks(rotation=0)
 
-    _setup_axes(title, xlabel=y, ylabel=x)
+    # Função auxiliar para formatar automaticamente
+    def format_label(label):
+        return label.replace("_", " ").title()
 
-    _add_value_labels(plt.gca(), orientation="horizontal")
+    # eixo invertido (horizontal)
+    final_xlabel = xlabel if xlabel else format_label(y)
+    final_ylabel = ylabel if ylabel else format_label(x)
+
+    _setup_axes(
+        title,
+        xlabel=final_xlabel,
+        ylabel=final_ylabel
+    )
+
+    # cálculo do offset baseado no range do eixo X
+    x_min, x_max = df_plot[y].min(), df_plot[y].max()
+    offset = (x_max - x_min) * label_offset
+
+    # labels externos (à direita das barras)
+    for i, v in enumerate(df_plot[y]):
+        plt.text(
+            v + offset,              # desloca para fora
+            i,                       # posição no eixo Y
+            str(int(v)),
+            va="center",
+            ha="left",               # ancora à esquerda → texto cresce pra direita
+            fontsize=10
+        )
 
     plt.tight_layout()
     plt.show()
@@ -103,7 +131,9 @@ def bar_timeseries(
     x,
     y,
     title,
-    COLORS
+    COLORS,
+    xlabel=None,
+    ylabel=None
 ):
 
     plt.figure(figsize=(9, 4.5))
@@ -114,10 +144,18 @@ def bar_timeseries(
         color=COLORS["primary"]
     )
 
-    plt.xticks(rotation=0)
+    plt.xticks(rotation=15)
     plt.yticks(rotation=0)
 
-    _setup_axes(title, xlabel=x, ylabel=y)
+    # Função auxiliar para formatar automaticamente
+    def format_label(label):
+        return label.replace("_", " ").title()
+
+    # Usa o manual se fornecido, senão formata automaticamente
+    final_xlabel = xlabel if xlabel else format_label(x)
+    final_ylabel = ylabel if ylabel else format_label(y)
+
+    _setup_axes(title, xlabel=final_xlabel, ylabel=final_ylabel)
 
     _add_value_labels(plt.gca())
 
@@ -164,7 +202,10 @@ def line_chart(
     x,
     y,
     title,
-    COLORS
+    COLORS,
+    xlabel=None,
+    ylabel=None,
+    label_offset=0.05
 ):
 
     plt.figure(figsize=(9, 4.5))
@@ -180,17 +221,36 @@ def line_chart(
     plt.xticks(rotation=0)
     plt.yticks(rotation=0)
 
-    _setup_axes(title, xlabel=x, ylabel=y)
+    # Função auxiliar para formatar automaticamente
+    def format_label(label):
+        return label.replace("_", " ").title()
+
+    # Labels finais
+    final_xlabel = xlabel if xlabel else format_label(x)
+    final_ylabel = ylabel if ylabel else format_label(y)
+
+    _setup_axes(title, xlabel=final_xlabel, ylabel=final_ylabel)
+
+    # cálculo do offset
+    y_min, y_max = df[y].min(), df[y].max()
+    offset = (y_max - y_min) * label_offset
+
+    # identifica o maior valor
+    max_value = y_max
 
     # labels nos pontos
     for i, v in enumerate(df[y]):
+        color = COLORS["primary"] if v == max_value else "black"
+
         plt.text(
             df[x].iloc[i],
-            v,
+            v + offset,
             str(int(v)),
             ha="center",
             va="bottom",
-            fontsize=10
+            fontsize=10,
+            color=color,
+            fontweight="bold" if v == max_value else "normal"
         )
 
     plt.tight_layout()
@@ -208,7 +268,9 @@ def bar_vertical_temporal_highlight(
     x,
     y,
     title,
-    COLORS
+    COLORS,
+    xlabel=None,
+    ylabel=None
 ):
     """
     Gráfico de barras verticais para variáveis temporais
@@ -230,14 +292,22 @@ def bar_vertical_temporal_highlight(
     )
 
     # labels horizontais
-    plt.xticks(rotation=0)
+    plt.xticks(rotation=15)
     plt.yticks(rotation=0)
+
+    # Função auxiliar para formatar automaticamente
+    def format_label(label):
+        return label.replace("_", " ").title()  # ou .capitalize()
+
+    # Define rótulos finais
+    final_xlabel = xlabel if xlabel else format_label(x)
+    final_ylabel = ylabel if ylabel else format_label(y)
 
     # padrão visual do relatório
     _setup_axes(
         title,
-        xlabel=x,
-        ylabel=y
+        xlabel=final_xlabel,
+        ylabel=final_ylabel
     )
 
     # valores nas barras
