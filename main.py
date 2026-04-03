@@ -4,6 +4,30 @@ from src.clean_data import processar_base_completa
 from src.geo_analysis import processar_geoespacial # <-- Sua importação aqui
 from src.analysis import realizar_analise
 
+def contar_enderecos_repetidos():
+    caminho = os.path.join(os.path.dirname(__file__), "data", "base_espacial.csv")
+    df = pd.read_csv(caminho)
+
+    colunas = ["bairro", "quadra", "complemento"]
+    total = len(df)
+
+    duplicados = df.duplicated(subset=colunas, keep=False)
+    qtd_repetidas = duplicados.sum()
+    percentual = (qtd_repetidas / total) * 100
+
+    print(f"\nTotal de linhas: {total}")
+    print(f"Linhas com endereço repetido (bairro+quadra+complemento): {qtd_repetidas}")
+    print(f"Percentual do total: {percentual:.2f}%")
+
+    contagem = df.groupby(colunas).size().reset_index(name="ocorrencias")
+    repetidos = contagem[contagem["ocorrencias"] > 1].sort_values("ocorrencias", ascending=False)
+
+    total_enderecos_unicos = len(contagem)
+    percentual_repetidos = (len(repetidos) / total_enderecos_unicos) * 100
+    print(f"\nEndereços únicos que se repetem: {len(repetidos)} de {total_enderecos_unicos} ({percentual_repetidos:.2f}%)")
+    print("\nTop 10 endereços mais repetidos:")
+    print(repetidos.head(10).to_string(index=False))
+
 def run():
     print("="*50)
     print("PROJETO PMDF - ANÁLISE MARIA DA PENHA")
