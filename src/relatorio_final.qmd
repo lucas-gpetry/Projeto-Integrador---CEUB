@@ -768,7 +768,7 @@ bar_horizontal_highlight(
 )
 ```
 
-> **Nota Analítica**: Identificamos mais de 300 lares no Distrito Federal que exigiram múltiplas intervenções policiais no mesmo ano. A simples ocorrência de um segundo chamado (que representa a esmagadora maioria dos casos) já evidencia falhas na rede de proteção contínua. Estes locais demandam encaminhamento ativo e urgente para o **PROVID** (Prevenção Orientada à Violência Doméstica), pois a probabilidade de um desfecho fatal escala drasticamente a cada nova viatura acionada.
+> **Nota Analítica**: Identificamos mais de 400 lares no Distrito Federal que exigiram múltiplas intervenções policiais no mesmo ano. A simples ocorrência de um segundo chamado (que representa a esmagadora maioria dos casos) já evidencia falhas na rede de proteção contínua. Estes locais demandam encaminhamento ativo e urgente para o **PROVID** (Prevenção Orientada à Violência Doméstica), pois a probabilidade de um desfecho fatal escala drasticamente a cada nova viatura acionada.
 
 ## Análise Geoespacial: O Vácuo de Policiamento
 
