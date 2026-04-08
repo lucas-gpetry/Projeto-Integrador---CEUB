@@ -25,7 +25,7 @@ def processar_geoespacial():
     print("Criando variáveis de Turno e Tipo de Moradia...")
     df['COMPLEMENTO_CLEAN'] = df['complemento'].fillna('').str.upper()
     df['QUADRA_CLEAN'] = df['quadra'].fillna('').str.upper()
-    df['ENDERECO_BUSCA'] = df['QUADRA_CLEAN'] + " " + df['COMPLEMENTO_CLEAN']
+    df['ENDERECO_BUSCA'] = df['cidade'].fillna('').str.upper() + " " + df['QUADRA_CLEAN'] + " " + df['COMPLEMENTO_CLEAN']
 
     cond_apt = df['ENDERECO_BUSCA'].str.contains(r'APTO|APARTAMENTO|APT|BLOCO|EDIF|ED\.|ANDAR|KITNET|RESIDENCIAL', regex=True)
     cond_casa = df['ENDERECO_BUSCA'].str.contains(r'CASA|LOTE|CHACARA|FAZENDA|CONJUNTO', regex=True)
@@ -76,13 +76,14 @@ def processar_geoespacial():
         grid_export.to_file(caminho_grade, driver='GeoJSON')
         
         # --- 4. MAPA DE CAMADAS ---
-        print("Gerando mapa com Ocorrências, Batalhões e Feminicídios (PCDF)...")
+        print("Gerando Mapas Interativos...")
         contagem_grid = intersecao_unica.groupby('id_celula').size().reset_index(name='total_ocorrencias')
         grid_mapa = grid_export.merge(contagem_grid, on='id_celula')
 
+        # Cria o mapa base
         mapa_risco = folium.Map(location=[-15.793889, -47.882778], zoom_start=11, tiles='CartoDB dark_matter')
         
-        # Camada 1: Calor
+        # Camada 1: Calor (Grade)
         folium.Choropleth(
             geo_data=grid_mapa, data=grid_mapa, columns=['id_celula', 'total_ocorrencias'],
             key_on='feature.properties.id_celula', fill_color='YlOrRd', fill_opacity=0.8, line_opacity=0.3,
@@ -99,18 +100,20 @@ def processar_geoespacial():
                     icon=folium.Icon(color='blue', icon='shield', prefix='fa')
                 ).add_to(mapa_risco)
 
+        # SALVA O PRIMEIRO MAPA (Apenas PMDF)
+        caminho_mapa_1 = os.path.join(docs_dir, "mapa_1_batalhoes.html")
+        mapa_risco.save(caminho_mapa_1)
+        print(f"🗺️ Mapa 1 (Batalhões) salvo em: {caminho_mapa_1}")
+
         # Camada 3: Feminicídios (Inteligência Geográfica por RA)
         if os.path.exists(caminho_fem):
-            # Lendo com encoding e sep corretos para padrão Brasil/Excel
             df_fem = pd.read_csv(caminho_fem, encoding='latin1', sep=';')
             
-            # Tratamento robusto para Idades (transforma o que não é número em NaN)
             if 'Idade - Vítima' in df_fem.columns:
                 df_fem['Idade - Vítima'] = pd.to_numeric(df_fem['Idade - Vítima'], errors='coerce')
             if 'Idade - Autor' in df_fem.columns:
                 df_fem['Idade - Autor'] = pd.to_numeric(df_fem['Idade - Autor'], errors='coerce')
 
-            # Dicionário Completo de Centroides (31 RAs mapeadas)
             coords_ra = {
                 'ÁGUAS CLARAS': [-15.8390, -48.0240], 'ARNIQUEIRAS': [-15.8480, -48.0050],
                 'BRAZLÂNDIA': [-15.6669, -48.2001], 'CANDANGOLÂNDIA': [-15.8500, -47.9450],
@@ -131,21 +134,17 @@ def processar_geoespacial():
             }
             
             for _, fem in df_fem.iterrows():
-                # Remove espaços em branco do nome da RA para garantir que bata com o dicionário
                 ra_nome = str(fem.get('RA', '')).strip().upper()
                 centroide = coords_ra.get(ra_nome, [-15.7938, -47.8827]) 
                 
-                # Jitter: Espalha matematicamente os casos pela RA
                 lat_jitter = centroide[0] + np.random.normal(0, 0.015) 
                 lon_jitter = centroide[1] + np.random.normal(0, 0.015)
                 
-                # Extrai dados (os .get() evitam erros caso a coluna não exista)
                 meio = fem.get('Meio Utilizado', 'Não Informado')
                 local = fem.get('Local', 'Não Informado')
                 motivo = fem.get('Motivação', 'Não Informada')
                 data_crime = fem.get('Data do Crime', 'Data Desconhecida')
                 
-                # Lógica para tratar Idade (Se for NaN, escreve "Não Informada")
                 id_vit = fem.get('Idade - Vítima', np.nan)
                 id_aut = fem.get('Idade - Autor', np.nan)
                 str_id_vit = f"{int(id_vit)} anos" if pd.notna(id_vit) else "Não Informada"
@@ -170,9 +169,10 @@ def processar_geoespacial():
                     popup=folium.Popup(texto_popup, max_width=300)
                 ).add_to(mapa_risco)
 
-        caminho_mapa = os.path.join(docs_dir, "mapa_crime_vs_batalhoes.html")
-        mapa_risco.save(caminho_mapa)
-        print(f"🗺️ Mapa Final salvo em: {caminho_mapa}")
+        # SALVA O SEGUNDO MAPA (PMDF + PCDF)
+        caminho_mapa_2 = os.path.join(docs_dir, "mapa_2_feminicidios.html")
+        mapa_risco.save(caminho_mapa_2)
+        print(f"🗺️ Mapa 2 (Completo com Feminicídios) salvo em: {caminho_mapa_2}")
 
     else:
         df_final = df
