@@ -1,0 +1,92 @@
+/* styles.css */
+
+/* Aumentar a largura máxima do conteúdo */
+body {
+  max-width: 1200px;  /* largura do conteúdo central */
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 10px;   /* padding interno */
+  padding-right: 10px;
+}
+
+/* Opcional: ajustar fonte e espaçamento */
+body {
+  font-family: 'Montserrat', sans-serif;
+  line-height: 1.4;
+  font-size: 14px;
+}
+
+figure, table {
+  width: 100% !important;
+}
+
+/* Aumentar gráficos para ocupar toda a largura do conteúdo */
+figure, .cell-output, .plot-container {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Evitar barra de rolagem horizontal */
+figure img, figure svg {
+  width: 100% !important;
+  height: auto !important;
+}
+
+iframe, .plotly {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+h1.title-with-image {
+  display: flex;
+  align-items: center;
+  gap: 100px;
+}
+
+h1.title-with-image img {
+  height: 5px;
+}
+
+.botao-mapa {
+  display: inline-block;
+  padding: 10px 20px;
+  background-color: #8E1616;
+  color: white !important;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+}
+
+.botao-mapa:hover {
+  background-color: #8E1616;
+}
+
+body, h1, h2, h3, h4, h5, h6, p, li, a {
+  font-family: 'Montserrat', sans-serif;
+  color: black;
+}
+
+.header-section-number {
+  color: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+}
+
+.header-custom {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.header-custom img {
+  height: 110px;
+}
+
+.quarto-title-block .title {
+  display: none;
+}
+
+
+

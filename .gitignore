@@ -22,4 +22,6 @@ __pycache__/
 .quarto-cache/
 *_files/
 
-
+#Variáveis Quarto
+/.quarto/ 
+**/*.quarto_ipynb
