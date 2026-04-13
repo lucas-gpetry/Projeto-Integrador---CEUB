@@ -1,0 +1,10 @@
+project:
+  type: website
+
+website:
+  title: "Relatório Analítico"
+
+format:
+  html:
+    theme: cosmo
+    css: style.css
