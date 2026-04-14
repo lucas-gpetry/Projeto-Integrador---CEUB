@@ -330,8 +330,8 @@ def bar_horizontal_highlight(
 
 # Consumo de álcool
 
-Este é o fator associado mais representativo dentre os dados analisados. Cerca de 12% das ocorrências estão relacionadas ao consumo de álcool
-
+Este é o fator associado mais representativo dentre os dados analisados. Cerca de 12% das ocorrências estão relacionadas ao consumo de álcool. 
+Este fator foi identificado por meio de processamento de linguagem natural (NLP), buscando termos como embriaguez, bebida, cerveja, entre outros, nos históricos das ocorrências. Cerca de 12% dos registros mencionam o consumo de álcool no contexto da agressão. Contudo, o contexto apresenta uma limitação importante: esse dado reflete o que foi registrado pelo policial no B.O., e não uma constatação clínica. Casos em que houve consumo mas não foi relatado não aparecem nesta análise, o que sugere que o percentual real pode ser superior.
 **Observa-se que há uma tendência à linearidade quanto ao total de casos registrados por dia da semana** Isso sugere que ocorrências nesse contexto não estão restritas a datas comemorativas ou finais de semana. Pelo contrário, a ausência de sazonalidade indica que o consumo de álcool por parte dos agressores é constante
 
 ```{python}
