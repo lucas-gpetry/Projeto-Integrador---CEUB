@@ -50,7 +50,7 @@ Este relatório consolida os insights extraídos a partir da base de ocorrência
 
 # Visão Geral
 
-Essa análise leva em consideração 12.123 ocorrências associadas à Lei Maria da Penha. Os dados são referentes ao ano de 2024
+Essa análise leva em consideração 12.123 ocorrências associadas à Lei Maria da Penha. Os dados são referentes ao ano de 2025
 
 **De maneira geral, as ocorrências estão bem distribuídas ao longo dos meses, o que sugere que datas comemorativas não são um fator determinante para que a violência aconteça**
 
@@ -166,7 +166,7 @@ bar_vertical_temporal_highlight(
 )
 ```
 
-**Nessa esteira, o horário das ocorrências também corresponde ao provável período de convívio entre a vítima e o agressor. As ocorrências durante a madrugada também estão associadas ao consumo de álcool**
+**O horário das ocorrências reforça esse padrão: há uma concentração expressiva nos períodos noturnos, especialmente entre 20h e 23h, o que é compatível com o momento de maior convívio doméstico entre vítima e agressor. Nessa mesma janela horária, observa-se a maior incidência de ocorrências associadas ao consumo de álcool, com pico às 21h — dado que converge com a análise por dia da semana e sugere que o agravamento noturno não é apenas circunstancial, mas frequentemente potencializado pelo uso de substâncias.**
 
 ```{python}
 # PREPARAÇÃO DOS DADOS
@@ -218,9 +218,9 @@ A violência contra a mulher pode ser classificada em 5 diferentes tipos:
 -   Sexual
 -   Patrimonial
 
-**Nas ocorrências analisadas, observa-se que mais de 70% dos casos envolvem violência física ou pastrimonial**
+**Nas ocorrências analisadas, observa-se que mais de 70% dos casos envolvem violência física ou patrimonial**
 
-Isso não significa que as outras categorias sejam menos frequentes, mas que podem ser subnotificadas (Provavelmente uma mulher não vai chamar a Polícia Militar devido a uma violência exclusivamente psicológica)
+Nas ocorrências analisadas, mais de 70% dos casos envolvem violência física ou patrimonial. Esse dado, porém, deve ser interpretado com cautela: categorias como violência psicológica, moral e sexual tendem a ser subnotificadas nos registros policiais, uma vez que dificilmente motivam, por si sós, o acionamento da Polícia Militar. A menor representatividade dessas categorias nos dados reflete, portanto, uma limitação do canal de registro — não necessariamente sua menor ocorrência na realidade.
 
 ```{python}
 
@@ -274,7 +274,7 @@ Além disso, é possível e muito provável que haja coocorrências de diferente
 
 # Fatores Associados
 
-**Mais de 30% das ocorrências estão associadas a algum fator externo como consumo de álcool ou drogas, descumprimento de medida protetiva ou término recente de relacionamento.**
+**Mais de 30% das ocorrências estão associadas a pelo menos um fator agravante, como consumo de álcool ou drogas, descumprimento de medida protetiva ou término recente de relacionamento. Desse total, os dois fatores mais recorrentes — consumo de álcool (≈ 12%) e descumprimento de medida protetiva (≈ 11%) — respondem juntos por cerca de 23% das ocorrências analisadas.**
 
 **Consumo de álcool ou descumprimento de medida protetiva são fatores presentes em cerca de 23% das ocorrências analisadas**
 
@@ -706,9 +706,9 @@ bar_vertical_temporal_highlight(
 )
 ```
 
-# Reincidência e Ciclo de Violência
+# Reiteração e Ciclo de Violência
 
-A análise de reincidência é o termômetro do **"enxugamento de gelo"** no policiamento ostensivo. Para contornar a imprecisão natural dos aparelhos de GPS das viaturas (que podem variar alguns metros), a clusterização não foi feita por coordenadas, mas sim por meio de **engenharia de texto** cruzando a Quadra e o Complemento (ex: "QNN 06 CASA 31").
+A análise de reiteração é o termômetro do **"enxugamento de gelo"** no policiamento ostensivo. Para contornar a imprecisão natural dos aparelhos de GPS das viaturas (que podem variar alguns metros), a clusterização não foi feita por coordenadas, mas sim por meio de **engenharia de texto** cruzando a Quadra e o Complemento (ex: "QNN 06 CASA 31").
 
 **Os dados revelam uma realidade alarmante: centenas de lares acionaram o 190 repetidas vezes em um curto espaço de tempo, indicando falhas na rede de proteção contínua.**
 
