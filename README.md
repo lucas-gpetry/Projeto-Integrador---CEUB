@@ -58,3 +58,7 @@ Este módulo abstrai a lógica de visualização, permitindo que os notebooks e 
 2. Garanta que o arquivo `base_original_pmdf.xlsx` está na pasta `data/`.
 3. Rode a esteira completa: `python main.py`
 4. Valide a integridade dos dados gerados: `python src/audit.py`
+
+## URL do Projeto 
+
+https://lucas-gpetry.github.io/Projeto-Integrador---CEUB/
