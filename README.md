@@ -4,11 +4,49 @@ Este projeto consiste em um pipeline (esteira) de Engenharia de Dados, Análise 
 
 ## Arquitetura do Pipeline
 
-O fluxo de dados segue uma arquitetura modular dividida em 3 etapas principais:
+O pipeline transforma os registros brutos da PMDF em uma base analítica enriquecida e, por
+fim, em mapas e um relatório Quarto. O `main.py` executa as três etapas de tratamento em
+sequência; os arquivos CSV funcionam como artefatos persistidos entre as etapas.
 
-1. **Limpeza e Padronização (Data Cleaning)**
-2. **Engenharia Geoespacial (Feature Engineering & Spatial Join)**
-3. **Classificação por Inteligência Artificial (NLP)**
+```mermaid
+flowchart LR
+    A[(data/base_original_pmdf.xlsx)] --> B[1. Limpeza e padronização<br/>clean_data.py]
+    B --> B1[(data/base_limpa.csv)]
+
+    BAT[(batalhoes_pmdf.csv)] --> C
+    FEM[(feminicidios_pcdf.csv)] --> C
+    B1 --> C[2. Engenharia geoespacial<br/>geo_analysis.py]
+    C --> C1[(data/base_espacial.csv)]
+    C --> G[(data/grade_espacial_df_LIMPA.geojson)]
+    C --> M[[Mapas Folium<br/>docs/mapa_*.html]]
+
+    C1 --> D[3. Classificação textual<br/>analysis.py + spaCy + Regex]
+    D --> D1[(data/base_analisada.csv)]
+
+    D1 --> E[[Relatório analítico<br/>src/relatorio_final.qmd]]
+    E --> E1[[docs/relatorio_final.pdf]]
+
+    D1 -. validação .-> V[audit.py<br/>audit_reincidencia.py]
+```
+
+### Contratos de entrada e saída
+
+| Etapa | Entrada principal | Transformações | Saída persistida |
+|---|---|---|---|
+| Limpeza | `base_original_pmdf.xlsx` | Leitura segura, extração de ano/mês/dia/hora e normalização do histórico | `base_limpa.csv` |
+| Geoespacial | `base_limpa.csv` + bases auxiliares | Correção de coordenadas, `TURNO`, `TIPO_MORADIA`, reincidência por endereço, *spatial join* em células de 500 m | `base_espacial.csv`, mapas HTML e grade GeoJSON |
+| NLP | `base_espacial.csv` | Regex para fatores de contexto e spaCy para tipos de violência, negação e desfecho | `base_analisada.csv` |
+| Apresentação | `base_analisada.csv` | Agregações temporais, análise de fatores, reincidência e visualizações | `relatorio_final.pdf` |
+
+### Governança e validação
+
+- Os dados brutos e artefatos CSV ficam em `data/`, que não deve ser versionada por conter
+  informações sensíveis e por seu tamanho.
+- `src/utils/anonimizacao.py` contém a rotina de substituição de nomes, CPFs, telefones e
+  matrículas por *placeholders*. Na implementação atual, ela ainda não é chamada pelo
+  `main.py`; deve ser executada antes de qualquer compartilhamento ou exportação da base.
+- `audit.py` e `audit_reincidencia.py` fazem validações independentes após a geração da base
+  final, permitindo conferir contagens, flags e reincidência sem alterar os dados.
 
 ---
 
