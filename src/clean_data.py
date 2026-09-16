@@ -41,7 +41,8 @@ def processar_base_completa():
     df["historico_limpo"] = df[coluna_texto].apply(limpar_historico)
 
     # 5. Salvar resultado
-    df.to_csv(caminho_saida, index=False, encoding='utf-8')
+    # UTF-8 com BOM: preserva acentos ao abrir os artefatos no Excel.
+    df.to_csv(caminho_saida, index=False, encoding='utf-8-sig')
     print(f"\n--- Finalizado! Base salva em: {caminho_saida} ---")
 
 if __name__ == "__main__":

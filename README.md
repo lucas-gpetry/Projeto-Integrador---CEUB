@@ -4,9 +4,10 @@ Este projeto consiste em um pipeline (esteira) de Engenharia de Dados, Análise 
 
 ## Arquitetura do Pipeline
 
-O pipeline transforma os registros brutos da PMDF em uma base analítica enriquecida e, por
-fim, em mapas e um relatório Quarto. O `main.py` executa as três etapas de tratamento em
-sequência; os arquivos CSV funcionam como artefatos persistidos entre as etapas.
+O pipeline transforma os registros brutos da PMDF em uma base analítica enriquecida, mapas,
+agrupamentos para validação e uma comparação agregada com notificações do SINAN. O `main.py`
+executa automaticamente as cinco etapas em sequência; os arquivos CSV funcionam como
+artefatos persistidos entre as etapas.
 
 ```mermaid
 flowchart LR
@@ -23,8 +24,13 @@ flowchart LR
     C1 --> D[3. Classificação textual<br/>analysis.py + spaCy + Regex]
     D --> D1[(data/base_analisada.csv)]
 
-    D1 --> E[[Relatório analítico<br/>src/relatorio_final.qmd]]
-    E --> E1[[docs/relatorio_final.pdf]]
+    D1 --> N[4. Agrupamentos e validação NLP<br/>scripts/agrupamentos_nlp.py]
+    N --> N1[(outputs/agrupamentos_nlp/)]
+
+    SINAN[(data/violencia_mulher_DF_2010_2025.csv)] --> S[5. Tratamento SINAN e integração agregada<br/>sinan_pipeline.py]
+    D1 --> S
+    S --> S1[(data/sinan_mulher_df_tratada.csv)]
+    S --> S2[(outputs/sinan_integracao/)]
 
     D1 -. validação .-> V[audit.py<br/>audit_reincidencia.py]
 ```
@@ -36,7 +42,8 @@ flowchart LR
 | Limpeza | `base_original_pmdf.xlsx` | Leitura segura, extração de ano/mês/dia/hora e normalização do histórico | `base_limpa.csv` |
 | Geoespacial | `base_limpa.csv` + bases auxiliares | Correção de coordenadas, `TURNO`, `TIPO_MORADIA`, reincidência por endereço, *spatial join* em células de 500 m | `base_espacial.csv`, mapas HTML e grade GeoJSON |
 | NLP | `base_espacial.csv` | Regex para fatores de contexto e spaCy para tipos de violência, negação e desfecho | `base_analisada.csv` |
-| Apresentação | `base_analisada.csv` | Agregações temporais, análise de fatores, reincidência e visualizações | `relatorio_final.pdf` |
+| Agrupamentos NLP | `base_analisada.csv` | Agrupamento por tipo de violência, fatores contextuais, desfecho, combinações de flags e endereço | `outputs/agrupamentos_nlp/` |
+| SINAN × PMDF | `violencia_mulher_DF_2010_2025.csv` + `base_analisada.csv` | Padronização de datas/códigos SINAN, recorte de ocorrências no DF, perfil comparativo, sazonalidade, coocorrências e correlações mensais/defasadas | `sinan_mulher_df_tratada.csv`, `outputs/sinan_integracao/` |
 
 ### Governança e validação
 
@@ -47,20 +54,32 @@ flowchart LR
   `main.py`; deve ser executada antes de qualquer compartilhamento ou exportação da base.
 - `audit.py` e `audit_reincidencia.py` fazem validações independentes após a geração da base
   final, permitindo conferir contagens, flags e reincidência sem alterar os dados.
+- `outputs/agrupamentos_nlp/` é uma saída local ignorada pelo Git, pois os arquivos de
+  conferência reproduzem históricos e demais campos potencialmente sensíveis.
+- A integração SINAN × PMDF não faz *join* de pessoas, endereços, protocolos ou casos. SINAN
+  representa notificações de saúde, enquanto PMDF representa atendimentos/chamados policiais;
+  a unidade comum é o mês de ocorrência. Reincidência por endereço no PMDF e `OUT_VEZES` no
+  SINAN não são a mesma variável e não são correlacionadas.
+- `outputs/sinan_integracao/` e a camada tratada SINAN são saídas locais ignoradas pelo Git.
+  Consulte `docs/sinan_pmdf_metodologia.md` para os critérios e limites de interpretação.
 
 ---
 
 ## Estrutura de Diretórios e Arquivos
 
 ### Raiz do Projeto
-* `main.py`: O **Orquestrador**. Aciona os módulos de limpeza, geoespacial e NLP em sequência, medindo o tempo de execução e garantindo o fluxo correto dos dados.
+* `main.py`: O **Orquestrador**. Aciona os módulos de limpeza, geoespacial, NLP, agrupamentos e integração SINAN em sequência, medindo o tempo de execução e garantindo o fluxo correto dos dados.
 * `requirements.txt`: Lista de dependências e bibliotecas Python necessárias para rodar o projeto.
 
 ### `src/` (Motores Principais)
 * `clean_data.py`: Responsável por ler o Excel bruto, extrair variáveis de tempo (ano, mês, dia) e realizar a normalização básica do texto dos históricos (remoção de acentos e conversão para minúsculas). Gera a `base_limpa.csv`.
 * `geo_analysis.py`: O **Motor Espacial**. Cria variáveis de contexto (`TURNO`, `TIPO_MORADIA`) com base em Regex. Isola coordenadas válidas, corrige erros de formatação (vírgulas/pontos) e realiza um cruzamento espacial (*Spatial Join*) com uma grade poligonal de 500x500m do DF. Retorna o `id_celula` para a base preservando todas as linhas originais (evitando perda de dados sem GPS). Gera a `base_espacial.csv` e o mapa interativo.
 * `analysis.py`: O **Motor NLP**. Consome a base espacial e aplica a inteligência artificial (spaCy + Regex) em processamento de lote (`nlp.pipe`). Extrai flags cruciais como `v_fisica`, `flag_arma_fogo` e `flag_alcool`. Gera a `base_analisada.csv` final.
+* `sinan_pipeline.py`: Mantém o CSV SINAN bruto intacto, acrescenta campos analíticos e produz coortes de violência interpessoal para comparação mensal agregada com PMDF. Também gera perfil de qualidade, definições, séries anuais/mensais, coocorrências, sazonalidade, reincidência conceitual e correlações Pearson/Spearman, inclusive com defasagens e ajuste para múltiplos testes.
 * `audit.py`: Script avulso de validação (*Ground Truthing*). Imprime um relatório no terminal com estatísticas vitais e amostras de texto classificado para garantir a integridade da pipeline.
+
+### `scripts/` (Agrupamentos e validação)
+* `agrupamentos_nlp.py` (ou `agrupamentos_nlp.ps1` no Windows): Lê a `base_analisada.csv` e gera arquivos CSV separados por cada categoria NLP, combinações de flags, agrupamento por endereço e, na versão Python, a planilha consolidada `agrupamentos_nlp.xlsx` em `outputs/agrupamentos_nlp/`. As saídas são gravadas em UTF-8 com BOM para abertura correta no Excel; o fallback PowerShell também corrige textos legados em UTF-8 interpretados como Latin-1.
 
 ### `src/utils/` (Ferramentas de Apoio)
 Contém funções auxiliares importadas pelos motores principais:
@@ -82,7 +101,9 @@ Este módulo abstrai a lógica de visualização, permitindo que os notebooks e 
 ### `data/` (Repositório de Dados)
 *Não versionado no Git por questões de LGPD e tamanho.*
 * Recebe a `base_original_pmdf.xlsx`.
+* Recebe `violencia_mulher_DF_2010_2025.csv`, exportação SINAN de notificações de violência contra mulheres.
 * Armazena os artefatos intermediários (`base_limpa.csv`, `base_espacial.csv`) e a `base_analisada.csv` final.
+* Armazena localmente `sinan_mulher_df_tratada.csv`; o arquivo-fonte SINAN não é alterado.
 * Contém a `grade_espacial_df_LIMPA.geojson` (usada pelo modelo de Machine Learning).
 
 ### `docs/` (Artefatos Visuais)
@@ -94,8 +115,9 @@ Este módulo abstrai a lógica de visualização, permitindo que os notebooks e 
 
 1. Instale as dependências: `pip install -r requirements.txt`
 2. Garanta que o arquivo `base_original_pmdf.xlsx` está na pasta `data/`.
-3. Rode a esteira completa: `python main.py`
-4. Valide a integridade dos dados gerados: `python src/audit.py`
+3. Garanta também que `violencia_mulher_DF_2010_2025.csv` está em `data/`.
+4. Rode a esteira completa, incluindo agrupamentos NLP e integração SINAN: `python main.py`
+5. Valide a integridade dos dados gerados: `python src/audit.py`
 
 ## URL do Projeto 
 

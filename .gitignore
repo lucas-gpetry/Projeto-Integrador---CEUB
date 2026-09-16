@@ -8,6 +8,11 @@ data/*.xlsx
 data/*.csv
 !data/.gitkeep
 
+# Exportações locais de validação (contêm dados sensíveis)
+outputs/reincidencia_validacao/
+outputs/agrupamentos_nlp/
+outputs/sinan_integracao/
+
 # Mac OS
 .DS_Store
 

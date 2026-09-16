@@ -47,15 +47,16 @@ header-includes:
 -   Alcoolismo
 -   Descumprimento de medida protetiva
 -   Casos de reiteração
+-   Integração complementar: SINAN × PMDF
 -   Insights
 
 # Introdução
 
-Este relatório consolida os insights extraídos a partir da base de ocorrências da Lei Maria da Penha registrados pela PMDF em 2025. O objetivo desta análise é identificar padrões e contextos
+Este relatório consolida os insights extraídos a partir da base de ocorrências da Lei Maria da Penha registrados pela PMDF em 2024. O objetivo desta análise é identificar padrões e contextos.
 
 # Visão Geral
 
-Essa análise leva em consideração 12.123 ocorrências associadas à Lei Maria da Penha. Os dados são referentes ao ano de 2025.
+Essa análise leva em consideração 12.123 ocorrências associadas à Lei Maria da Penha. Os dados são referentes ao ano de 2024.
 
 **De maneira geral, as ocorrências estão bem distribuídas ao longo dos meses, o que sugere que datas comemorativas não são um fator determinante para que a violência aconteça**
 
@@ -789,6 +790,127 @@ Para validar a eficácia da nossa clusterização de risco, cruzamos as ocorrên
 Isso valida empiricamente a nossa tese preditiva: **a mancha de chamados emergenciais "antecipa" a mancha do feminicídio**.
 
 ![](../docs/print_feminicidios.png){fig-align="center"}
+
+# Integração complementar: SINAN × PMDF
+
+## Por que as bases não são unidas caso a caso
+
+Além dos atendimentos da PMDF, foi analisada a base do **SINAN — Sistema de Informação de Agravos de Notificação**. Ela registra notificações feitas por serviços de saúde, enquanto a PMDF registra chamados e atendimentos policiais. Portanto, um mesmo episódio pode aparecer nas duas fontes, em apenas uma delas ou em nenhuma.
+
+Não foi realizado cruzamento por pessoa, endereço, protocolo ou texto livre. A integração ocorre apenas no nível agregado de mês e de indicadores, preservando a privacidade e evitando inferências indevidas. O recorte SINAN utilizado contempla mulheres, ocorrência no DF e violência não autoprovocada confirmada.
+
+Em 2024, o recorte resultou em **3.112 notificações SINAN**, frente a **12.123 atendimentos PMDF**. O SINAN bruto contém 35.745 registros; foram identificadas 440 datas de ocorrência ausentes ou inválidas e cinco duplicatas exatas, mantidas rastreáveis na camada tratada.
+
+```{python}
+#| label: tbl-perfil-comparativo-sinan-pmdf
+#| tbl-cap: "Composição dos indicadores em PMDF e SINAN (2024)"
+
+from pathlib import Path
+from IPython.display import display
+
+integration_dir = Path("../outputs/sinan_integracao")
+comparison_path = integration_dir / "perfil_comparativo_pmdf_sinan_2024.csv"
+monthly_path = integration_dir / "pmdf_sinan_mensal_2024.csv"
+lag_path = integration_dir / "correlacoes_defasadas_pmdf_sinan_2024.csv"
+recurrence_path = integration_dir / "reincidencia_conceitos_2024.csv"
+
+if not all(path.exists() for path in [comparison_path, monthly_path, lag_path, recurrence_path]):
+    raise FileNotFoundError(
+        "Saídas da integração ausentes. Execute `python main.py` antes de renderizar este relatório."
+    )
+
+df_comparativo = pd.read_csv(comparison_path, encoding="utf-8-sig")
+df_mensal_integracao = pd.read_csv(monthly_path, encoding="utf-8-sig")
+df_lags = pd.read_csv(lag_path, encoding="utf-8-sig")
+df_reincidencia_conceitos = pd.read_csv(recurrence_path, encoding="utf-8-sig")
+
+tabela_perfil = df_comparativo[
+    [
+        "rotulo",
+        "pmdf_percentual",
+        "sinan_percentual_entre_validas",
+        "sinan_ignorado_ou_vazio",
+    ]
+].copy()
+tabela_perfil.columns = [
+    "Indicador",
+    "PMDF (% dos atendimentos)",
+    "SINAN (% entre respostas válidas)",
+    "SINAN: ignorado/vazio (n)",
+]
+tabela_perfil["PMDF (% dos atendimentos)"] = tabela_perfil["PMDF (% dos atendimentos)"].map(lambda value: f"{value:.2f}%")
+tabela_perfil["SINAN (% entre respostas válidas)"] = tabela_perfil["SINAN (% entre respostas válidas)"].map(lambda value: f"{value:.2f}%")
+display(tabela_perfil.style.hide(axis="index"))
+```
+
+As diferenças de composição não estimam prevalência na população. Elas revelam, sobretudo, que cada canal registra dimensões diferentes do fenômeno: a violência sexual aparece em 37,95% das respostas válidas do SINAN e em 0,37% dos atendimentos PMDF; já o uso de objeto perfurocortante tem proporções semelhantes, 7,96% e 7,75%, respectivamente. A variável de álcool exige cautela adicional, pois 1.341 notificações SINAN do recorte não possuem resposta válida para esse campo.
+
+```{python}
+#| label: fig-composicao-sinan-pmdf
+#| fig-cap: "Composição dos indicadores nas duas fontes (2024)"
+#| fig-align: center
+
+plot_comparativo = df_comparativo.sort_values("pmdf_percentual")
+fig, ax = plt.subplots(figsize=(10, 5.5))
+y = np.arange(len(plot_comparativo))
+ax.barh(y - 0.18, plot_comparativo["pmdf_percentual"], height=0.36, label="PMDF (% dos atendimentos)", color=COLORS["primary"])
+ax.barh(y + 0.18, plot_comparativo["sinan_percentual_entre_validas"], height=0.36, label="SINAN (% entre respostas válidas)", color=COLORS["secondary"])
+ax.set_yticks(y)
+ax.set_yticklabels(plot_comparativo["rotulo"])
+ax.set_xlabel("Percentual")
+ax.set_title("Indicadores registrados por fonte — bases não diretamente equivalentes")
+ax.legend(frameon=False)
+ax.grid(axis="x", alpha=0.2)
+plt.tight_layout()
+plt.show()
+```
+
+## Sazonalidade e associação temporal
+
+Os picos mensais não coincidem: a PMDF atingiu seu maior volume em março (1.188 atendimentos), enquanto o SINAN atingiu o maior volume em setembro (322 notificações). Para comparar apenas o desenho sazonal, o gráfico abaixo mostra a participação de cada mês no total anual da respectiva fonte.
+
+```{python}
+#| label: fig-sazonalidade-sinan-pmdf
+#| fig-cap: "Participação mensal no total anual de cada fonte (2024)"
+#| fig-align: center
+
+meses_pt = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+plot_mensal = df_mensal_integracao.copy()
+plot_mensal["mes_nome"] = meses_pt
+plot_mensal["PMDF"] = plot_mensal["pmdf_volume_total"] / plot_mensal["pmdf_volume_total"].sum() * 100
+plot_mensal["SINAN"] = plot_mensal["sinan_primaria_volume_total"] / plot_mensal["sinan_primaria_volume_total"].sum() * 100
+
+fig, ax = plt.subplots(figsize=(10, 4.8))
+ax.plot(plot_mensal["mes_nome"], plot_mensal["PMDF"], marker="o", label="PMDF", color=COLORS["primary"])
+ax.plot(plot_mensal["mes_nome"], plot_mensal["SINAN"], marker="o", label="SINAN", color=COLORS["secondary"])
+ax.set_ylabel("Participação no total anual (%)")
+ax.set_xlabel("Mês")
+ax.set_title("Sazonalidade relativa das fontes")
+ax.legend(frameon=False)
+ax.grid(alpha=0.2)
+plt.tight_layout()
+plt.show()
+```
+
+As correlações mensais no mesmo período foram fracas e sem significância estatística: para o volume total, Pearson foi -0,4047 (*p*=0,1920). Também foram avaliadas defasagens de -3 a +3 meses. Embora uma combinação isolada tenha apresentado *p* bruto menor que 0,05, nenhum dos 49 testes permaneceu significativo após ajuste de Benjamini-Hochberg. Não há evidência para interpretar uma fonte como antecedente temporal da outra.
+
+## Reiteração: métricas distintas
+
+```{python}
+#| label: tbl-reiteracao-conceitos
+#| tbl-cap: "Métricas de reiteração — conceitos não comparáveis"
+
+tabela_reiteracao = df_reincidencia_conceitos[
+    ["fonte", "conceito", "numerador", "denominador_valido", "percentual", "observacao"]
+].copy()
+tabela_reiteracao.columns = ["Fonte", "Métrica", "Casos", "Base válida", "Percentual", "Interpretação"]
+tabela_reiteracao["Percentual"] = tabela_reiteracao["Percentual"].map(lambda value: f"{value:.2f}%")
+display(tabela_reiteracao.style.hide(axis="index"))
+```
+
+A PMDF registra repetição espacial de endereço (13,61% dos atendimentos), enquanto o SINAN registra histórico de violência informado na notificação (57,41% das respostas válidas). As métricas não representam a mesma pessoa, unidade de análise ou período e, por isso, não foram correlacionadas.
+
+> **Síntese da integração:** SINAN e PMDF se complementam para descrever canais distintos de atendimento à violência contra a mulher. Os resultados devem ser usados para investigar padrões agregados e qualificar políticas públicas, e não para estimar prevalência, subnotificação ou risco individual.
 
 # Conclusões e Próximos Passos
 

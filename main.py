@@ -1,8 +1,19 @@
 import time
 import os
+import sys
+import pandas as pd
 from src.clean_data import processar_base_completa
 from src.geo_analysis import processar_geoespacial # <-- Sua importação aqui
 from src.analysis import realizar_analise
+from scripts.agrupamentos_nlp import gerar_agrupamentos_nlp
+from src.sinan_pipeline import processar_sinan_e_integrar_pmdf
+
+
+# Mantém logs legíveis no terminal Windows e evita que caracteres dos módulos interrompam a esteira.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 def contar_enderecos_repetidos():
     caminho = os.path.join(os.path.dirname(__file__), "data", "base_espacial.csv")
@@ -37,20 +48,33 @@ def run():
 
     try:
         # ETAPA 1: Limpeza e Processamento Inicial 
-        print("\n[1/3] Iniciando Limpeza e Extração de Datas...")
+        print("\n[1/5] Iniciando Limpeza e Extração de Datas...")
         processar_base_completa()
         
         print("-" * 30)
 
         # ETAPA 2: Análise Geoespacial e Atributos 
-        print("[2/3] Aplicando Engenharia Geoespacial (Turnos, Moradia e Grade)...")
+        print("[2/5] Aplicando Engenharia Geoespacial (Turnos, Moradia e Grade)...")
         processar_geoespacial()
 
         print("-" * 30)
 
         # ETAPA 3: Análise com spaCy + Regex 
-        print("[3/3] Aplicando NLP...")
+        print("[3/5] Aplicando NLP...")
         realizar_analise()
+
+        print("-" * 30)
+
+        # ETAPA 4: Agrupamentos das categorias extraídas pelo NLP
+        print("[4/5] Gerando agrupamentos e planilhas de validação NLP...")
+        caminho_agrupamentos = gerar_agrupamentos_nlp(
+            input_path=os.path.join("data", "base_analisada.csv"),
+            output_dir=os.path.join("outputs", "agrupamentos_nlp"),
+        )
+
+        print("-" * 30)
+        print("[5/5] Tratando SINAN e integrando indicadores agregados com PMDF...")
+        caminho_sinan = processar_sinan_e_integrar_pmdf()
 
         fim_total = time.time()
         tempo_total = (fim_total - inicio_total) / 60
@@ -59,6 +83,8 @@ def run():
         print("✨ PIPELINE FINALIZADO COM SUCESSO!")
         print(f"Tempo total de execução: {tempo_total:.2f} minutos")
         print(f"Arquivo gerado: data/base_analisada.csv")
+        print(f"Agrupamentos gerados em: {caminho_agrupamentos}")
+        print(f"Integração SINAN × PMDF gerada em: {caminho_sinan}")
         print("="*50)
 
     except Exception as e:

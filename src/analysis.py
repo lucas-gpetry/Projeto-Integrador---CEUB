@@ -52,7 +52,8 @@ def realizar_analise():
         #df['flag_alcool'].astype(int) * 1
     #)
 
-    df.to_csv(caminho_out, index=False)
+    # UTF-8 com BOM: abre corretamente em Excel/PowerShell sem produzir mojibake.
+    df.to_csv(caminho_out, index=False, encoding="utf-8-sig")
     print(f"Análise concluída. Base salva com {df.shape[1]} colunas.")
 
 if __name__ == "__main__":
