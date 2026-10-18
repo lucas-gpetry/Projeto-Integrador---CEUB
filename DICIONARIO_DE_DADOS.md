@@ -17,7 +17,7 @@ Dados extraídos diretamente do sistema original, sem interferência preditiva.
 | Coluna | Tipo | Descrição |
 | :--- | :--- | :--- |
 | `historico` | String | Relato completo original escrito pelo policial militar. |
-| `historico_limpo` | String | Histórico padronizado (sem acentos, em minúsculas e sem caracteres especiais) preparado para o algoritmo de Inteligência Artificial. |
+| `historico_limpo` | String | Histórico padronizado (sem acentos, em minúsculas e sem caracteres especiais), usado pelas regras de Regex. O spaCy recebe o `historico` em minúsculas e com acentos, normalizado em tempo de execução (`normalizar_para_nlp`). |
 
 ## 3. Features Temporais (Extraídas)
 Variáveis essenciais para captura de sazonalidade e padrões de rotina pelo algoritmo.
@@ -34,11 +34,11 @@ Variáveis criadas pela Frente de Análise Espacial para padronizar o "Onde" oco
 
 | Coluna | Tipo | Descrição |
 | :--- | :--- | :--- |
-| `TIPO_MORADIA` | Categórico | Classificação do ambiente físico da ocorrência extraída via Regex. Valores: `CASA`, `APARTAMENTO`, `VIA PUBLICA`, `COMERCIO / SERVICO` ou `OUTROS / NÃO IDENTIFICADO`. |
+| `TIPO_MORADIA` | Categórico | Tipo de local inferido por Regex sobre quadra e complemento (palavras inteiras; o nome da cidade fica fora da busca). Valores: `CASA`, `APARTAMENTO`, `VIA PUBLICA`, `COMERCIO / SERVICO` ou `OUTROS / NÃO IDENTIFICADO`. "CONJUNTO" não conta como casa: é unidade de endereçamento no DF. Regras em `PADROES_TIPO_LOCAL` (`src/geo_analysis.py`). |
 | `id_celula` | Inteiro | **(Variável Chave Preditiva)** ID numérico do quadrante de 500x500 metros onde o crime ocorreu. *Nota: Cerca de 5.600 linhas possuem este campo nulo (NaN) propositalmente devido a ruídos no GPS original. O modelo preditivo espacial deve treinar apenas com linhas não-nulas.* |
 
 ## 5. Features Comportamentais e Contextuais (I.A. / NLP)
-*Flags* geradas pelo processamento de Linguagem Natural (spaCy) lendo o `historico_limpo`. Identificam a dinâmica da violência e agravantes de risco.
+*Flags* geradas pelo processamento de Linguagem Natural (Regex sobre o `historico_limpo` e spaCy sobre o `historico` com acentos). Identificam a dinâmica da violência e agravantes de risco. Menções negadas ("não agrediu", "não possui medida protetiva") não ativam a flag. Uma flag `False` significa "não identificado pelas regras", não "ausente no fato".
 
 ### 5.1 Tipos de Violência Mapeados
 | Coluna | Tipo | Descrição |
@@ -55,15 +55,15 @@ Variáveis criadas pela Frente de Análise Espacial para padronizar o "Onde" oco
 | `flag_alcool` / `flag_drogas` | Booleano | `True` se o B.O. cita embriaguez, consumo de álcool ou uso de entorpecentes pelo agressor. |
 | `flag_arma_fogo` | Booleano | `True` se houve uso ou ameaça com arma de fogo (revólver, pistola, disparo). |
 | `flag_arma_branca` | Booleano | `True` se houve uso de faca, canivete, facão ou tesoura. |
-| `flag_medida_protetiva`| Booleano | `True` se o B.O. menciona quebra/descumprimento de Medida Protetiva vigente. |
+| `flag_medida_protetiva`| Booleano | `True` se o B.O. menciona medida protetiva (vigente, solicitada ou descumprida). A regra não distingue o descumprimento: só 236 das 1.803 menções em 2024 citam "descumpr-". |
 | `flag_tornozeleira` | Booleano | `True` se o agressor estava sob monitoramento eletrônico. |
-| `flag_separacao` | Booleano | `True` se o conflito foi motivado por término recente, separação ou envolve "ex-companheiro". |
+| `flag_separacao` | Booleano | `True` se o histórico menciona término ou separação do relacionamento, ou envolve ex-parceiro ("ex-marido", "ex-companheira", "ex-namorado" etc.). |
 | `flag_filhos` | Booleano | `True` se havia filhos da vítima/casal presentes ou envolvidos no contexto da ocorrência. |
 
 ### 5.3 Desfecho da Ocorrência
 | Coluna | Tipo | Descrição |
 | :--- | :--- | :--- |
-| `desfecho` | Categórico | Ação tomada pela PMDF. Valores: `encaminhado_dp` (conduzido à delegacia), `resolvido_local` (acordo/orientação no local) ou `nao_identificado`. |
+| `desfecho` | Categórico | Ação tomada pela PMDF, inferida do texto. Valores: `encaminhado_dp` (condução, prisão ou menção a DP/delegacia/DEAM; tem prioridade), `resolvido_local` (orientação, advertência ou acordo) ou `nao_identificado` (nenhum dos termos). |
 ### 5.3 Dados ausentes
 A coluna G, quadra tem 23% de dados ausentes, e a coluna H, complemento 8,13% de dados ausentes. 
 

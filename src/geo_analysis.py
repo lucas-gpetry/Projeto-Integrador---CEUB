@@ -2,8 +2,48 @@ import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Polygon
 import numpy as np
-import folium 
+import folium
 import os
+
+# Delimitação de palavra evita casamentos parciais ("BR" em BRASILIA/SOBRADINHO, "BAR" em BARRACO).
+# A cidade fica fora da busca: o nome da RA não informa o tipo de local.
+# "CONJUNTO" não entra em casa: no DF é unidade de endereçamento, não tipo de moradia.
+PADROES_TIPO_LOCAL = {
+    'APARTAMENTO': r'\b(?:APTO|APARTAMENTO|APT|BLOCO|EDIF\w*|ED|ANDAR|KITNET|RESIDENCIAL)\b',
+    'CASA': r'\b(?:CASA|LOTE|CHACARA|FAZENDA)\b',
+    'VIA PUBLICA': r'\b(?:RUA|AVENIDA|ESTACIONAMENTO|PARQUE|PRACA|VIA|BR|PASSARELA)\b|\bDF-',
+    'COMERCIO / SERVICO': r'\b(?:BAR|LOJA|MERCADO|FARMACIA|SHOPPING|POSTO|DISTRIBUIDORA|RESTAURANTE|COMERCIO)\b',
+}
+TIPO_LOCAL_PADRAO = 'OUTROS / NÃO IDENTIFICADO'
+
+# Os mapas são publicados: nenhum elemento pode remeter a uma vítima individual.
+# Células com poucas ocorrências ficam fora do mapa, e os feminicídios aparecem só como contagem por RA.
+K_MINIMO_CELULA = 5
+K_MINIMO_RA = 3
+
+
+def celulas_publicaveis(contagem, k=K_MINIMO_CELULA):
+    """Mantém só as células com pelo menos k ocorrências."""
+    return contagem[contagem['total_ocorrencias'] >= k]
+
+
+def feminicidios_por_ra(ras):
+    """Conta casos por RA; o mapa não exibe atributos de casos individuais."""
+    return ras.dropna().str.strip().str.upper().value_counts()
+
+
+def rotulo_contagem(n, k=K_MINIMO_RA):
+    return f"{n} casos" if n >= k else f"menos de {k} casos"
+
+
+def classificar_tipo_local(quadra, complemento):
+    """Classifica o tipo de local pelo endereço; a ordem de PADROES_TIPO_LOCAL é a precedência."""
+    endereco = quadra.fillna('').str.upper() + " " + complemento.fillna('').str.upper()
+    tipo = pd.Series(TIPO_LOCAL_PADRAO, index=endereco.index)
+    for categoria, padrao in reversed(list(PADROES_TIPO_LOCAL.items())):
+        tipo = tipo.mask(endereco.str.contains(padrao, regex=True), categoria)
+    return tipo
+
 
 def processar_geoespacial():
     base_dir = os.getcwd()
@@ -27,16 +67,7 @@ def processar_geoespacial():
     df['QUADRA_CLEAN'] = df['quadra'].fillna('').str.upper()
     df['ENDERECO_BUSCA'] = df['cidade'].fillna('').str.upper() + " " + df['QUADRA_CLEAN'] + " " + df['COMPLEMENTO_CLEAN']
 
-    cond_apt = df['ENDERECO_BUSCA'].str.contains(r'APTO|APARTAMENTO|APT|BLOCO|EDIF|ED\.|ANDAR|KITNET|RESIDENCIAL', regex=True)
-    cond_casa = df['ENDERECO_BUSCA'].str.contains(r'CASA|LOTE|CHACARA|FAZENDA|CONJUNTO', regex=True)
-    cond_via = df['ENDERECO_BUSCA'].str.contains(r'RUA|AVENIDA|ESTACIONAMENTO|PARQUE|PRACA|VIA|BR|DF-|PASSARELA', regex=True)
-    cond_comercio = df['ENDERECO_BUSCA'].str.contains(r'BAR|LOJA|MERCADO|FARMACIA|SHOPPING|POSTO|DISTRIBUIDORA|RESTAURANTE|COMERCIO', regex=True)
-
-    df['TIPO_MORADIA'] = 'OUTROS / NÃO IDENTIFICADO'
-    df.loc[cond_casa, 'TIPO_MORADIA'] = 'CASA'
-    df.loc[cond_apt, 'TIPO_MORADIA'] = 'APARTAMENTO'
-    df.loc[cond_via & (df['TIPO_MORADIA'] == 'OUTROS / NÃO IDENTIFICADO'), 'TIPO_MORADIA'] = 'VIA PUBLICA'
-    df.loc[cond_comercio & (df['TIPO_MORADIA'] == 'OUTROS / NÃO IDENTIFICADO'), 'TIPO_MORADIA'] = 'COMERCIO / SERVICO'
+    df['TIPO_MORADIA'] = classificar_tipo_local(df['quadra'], df['complemento'])
 
     bins = [-1, 5, 11, 17, 23]
     labels = ['Madrugada', 'Manhã', 'Tarde', 'Noite']
@@ -77,7 +108,7 @@ def processar_geoespacial():
         
         # --- 4. MAPA DE CAMADAS ---
         print("Gerando Mapas Interativos...")
-        contagem_grid = intersecao_unica.groupby('id_celula').size().reset_index(name='total_ocorrencias')
+        contagem_grid = celulas_publicaveis(intersecao_unica.groupby('id_celula').size().reset_index(name='total_ocorrencias'))
         grid_mapa = grid_export.merge(contagem_grid, on='id_celula')
 
         # Cria o mapa base
@@ -87,7 +118,7 @@ def processar_geoespacial():
         folium.Choropleth(
             geo_data=grid_mapa, data=grid_mapa, columns=['id_celula', 'total_ocorrencias'],
             key_on='feature.properties.id_celula', fill_color='YlOrRd', fill_opacity=0.8, line_opacity=0.3,
-            legend_name='Risco Real (Nº de Chamados 190)'
+            legend_name=f'Ocorrências da Lei Maria da Penha em 2024 (células de 500 m com {K_MINIMO_CELULA} ou mais)'
         ).add_to(mapa_risco)
         
         # Camada 2: Batalhões
@@ -108,11 +139,8 @@ def processar_geoespacial():
         # Camada 3: Feminicídios (Inteligência Geográfica por RA)
         if os.path.exists(caminho_fem):
             df_fem = pd.read_csv(caminho_fem, encoding='latin1', sep=';')
-            
-            if 'Idade - Vítima' in df_fem.columns:
-                df_fem['Idade - Vítima'] = pd.to_numeric(df_fem['Idade - Vítima'], errors='coerce')
-            if 'Idade - Autor' in df_fem.columns:
-                df_fem['Idade - Autor'] = pd.to_numeric(df_fem['Idade - Autor'], errors='coerce')
+            anos = pd.to_datetime(df_fem['Data do Crime'], dayfirst=True, errors='coerce').dt.year
+            periodo = f"{int(anos.min())}–{int(anos.max())}"
 
             coords_ra = {
                 'ÁGUAS CLARAS': [-15.8390, -48.0240], 'ARNIQUEIRAS': [-15.8480, -48.0050],
@@ -133,40 +161,17 @@ def processar_geoespacial():
                 'VICENTE PIRES': [-15.8080, -48.0280]
             }
             
-            for _, fem in df_fem.iterrows():
-                ra_nome = str(fem.get('RA', '')).strip().upper()
-                centroide = coords_ra.get(ra_nome, [-15.7938, -47.8827]) 
-                
-                lat_jitter = centroide[0] + np.random.normal(0, 0.015) 
-                lon_jitter = centroide[1] + np.random.normal(0, 0.015)
-                
-                meio = fem.get('Meio Utilizado', 'Não Informado')
-                local = fem.get('Local', 'Não Informado')
-                motivo = fem.get('Motivação', 'Não Informada')
-                data_crime = fem.get('Data do Crime', 'Data Desconhecida')
-                
-                id_vit = fem.get('Idade - Vítima', np.nan)
-                id_aut = fem.get('Idade - Autor', np.nan)
-                str_id_vit = f"{int(id_vit)} anos" if pd.notna(id_vit) else "Não Informada"
-                str_id_aut = f"{int(id_aut)} anos" if pd.notna(id_aut) else "Não Informada"
-
-                texto_popup = (f"<div style='width: 200px; font-family: Arial;'>"
-                               f"<h4 style='color: darkred; margin-bottom: 5px;'>🛑 FEMINICÍDIO</h4>"
-                               f"<b>Data:</b> {data_crime}<br>"
-                               f"<b>RA:</b> {ra_nome}<br>"
-                               f"<b>Local:</b> {local}<br>"
-                               f"<b>Motivação:</b> {motivo}<br>"
-                               f"<b>Arma/Meio:</b> {meio}<br>"
-                               f"<hr style='margin: 5px 0;'>"
-                               f"<b>Idade Vítima:</b> {str_id_vit}<br>"
-                               f"<b>Idade Autor:</b> {str_id_aut}</div>")
-
+            # Um círculo por RA, com área proporcional ao número de casos (piso em K_MINIMO_RA,
+            # para que o tamanho não revele contagens suprimidas).
+            for ra_nome, n in feminicidios_por_ra(df_fem['RA']).items():
+                if ra_nome not in coords_ra:
+                    print(f"⚠️ RA sem centroide no mapa de feminicídios: {ra_nome} ({n} casos)")
+                    continue
                 folium.CircleMarker(
-                    location=[lat_jitter, lon_jitter],
-                    radius=5, 
-                    color='red', fill=True, fill_color='darkred', fill_opacity=0.9,
-                    tooltip=f"Feminicídio: {meio}",
-                    popup=folium.Popup(texto_popup, max_width=300)
+                    location=coords_ra[ra_nome],
+                    radius=4 + 2 * np.sqrt(max(n, K_MINIMO_RA)),
+                    color='red', fill=True, fill_color='darkred', fill_opacity=0.7,
+                    tooltip=f"{ra_nome}: {rotulo_contagem(n)} de feminicídio ({periodo})",
                 ).add_to(mapa_risco)
 
         # SALVA O SEGUNDO MAPA (PMDF + PCDF)
