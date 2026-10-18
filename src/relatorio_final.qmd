@@ -1,925 +1,639 @@
 ---
-title: "Relatório Analítico — Violência contra a Mulher"
-author: "Arthur Virgílio, Emanuela Araújo, Felipe Teodoro, José Carvalho, Lucas Petry"
+title: "Relatório Analítico — Violência contra a Mulher no Distrito Federal"
+subtitle: "Ocorrências da Lei Maria da Penha atendidas pela PMDF em 2024"
+author:
+  - Arthur Virgílio
+  - Emanuela Araújo
+  - Felipe Teodoro
+  - José Carvalho
+  - Lucas Petry
 date: today
+date-format: "DD/MM/YYYY"
+lang: pt-BR
 
 format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    embed-resources: true
+    theme: cosmo
   pdf:
-    toc: false
+    toc: true
+    toc-depth: 2
     number-sections: true
     geometry: margin=2.5cm
     colorlinks: true
     linkcolor: black
     urlcolor: black
     citecolor: black
-    output-dir: docs
-    mainfont: "Montserrat"
+    mainfont: Montserrat
+    mainfontoptions:
+      - Path=../fonts/
+      - Extension=.ttf
+      - UprightFont=*-Regular
+      - BoldFont=*-Bold
+      - AutoFakeSlant=0.2
+    sansfont: Montserrat
+    sansfontoptions:
+      - Path=../fonts/
+      - Extension=.ttf
+      - UprightFont=*-Regular
+      - BoldFont=*-Bold
+      - AutoFakeSlant=0.2
+    header-includes:
+      - \usepackage{fancyhdr}
+      - \pagestyle{fancy}
+      - \fancyhead[L]{Relatório Analítico}
+      - \fancyhead[R]{Violência contra a Mulher}
+      - \fancyfoot[C]{\thepage}
+      - \usepackage{etoolbox}
+      - \AtBeginEnvironment{longtable}{\small}
 
-fontsize: 12pt
-linestretch: 1.2
-mainfont: "Montserrat"
+fontsize: 11pt
+linestretch: 1.25
 
 execute:
   echo: false
   warning: false
   message: false
-
-header-includes:
-  - \usepackage{fancyhdr}
-  - \pagestyle{fancy}
-  - \fancyhead[L]{Relatório Analítico}
-  - \fancyhead[R]{Violência contra a Mulher}
-  - \fancyfoot[C]{\thepage}
-  - \usepackage{titling}
-  - \preauthor{\begin{center}\large}
-  - \postauthor{\end{center}}
 ---
 
-![](../docs/pmdf.png){fig-align="center"}
-
-\newpage
-
-# Sumário Executivo
-
--   Visão geral
--   Diferentes tipos de violência
--   Fatores associados
--   Alcoolismo
--   Descumprimento de medida protetiva
--   Casos de reiteração
--   Integração complementar: SINAN × PMDF
--   Insights
-
-# Introdução
-
-Este relatório consolida os insights extraídos a partir da base de ocorrências da Lei Maria da Penha registrados pela PMDF em 2024. O objetivo desta análise é identificar padrões e contextos.
-
-# Visão Geral
-
-Essa análise leva em consideração 12.123 ocorrências associadas à Lei Maria da Penha. Os dados são referentes ao ano de 2024.
-
-**De maneira geral, as ocorrências estão bem distribuídas ao longo dos meses, o que sugere que datas comemorativas não são um fator determinante para que a violência aconteça**
-
 ```{python}
-from utils.report_theme import set_report_theme
-from utils.report_plots import *
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-# TEMA GLOBAL DO RELATÓRIO ANALÍTICO
-import matplotlib.pyplot as plt
-import seaborn as sns
-COLORS = set_report_theme()
-
-df = pd.read_csv('../data/base_analisada.csv', sep=None, engine='python', encoding='utf-8')
-```
-
-```{python}
-# PREPARAÇÃO DOS DADOS
-df_ocorrencias = df.copy()
-
-# cria coluna Ano-Mês usando campos já existentes
-df_ocorrencias["ano_mes"] = (
-    df_ocorrencias["ano"].astype(str)
-    + "-"
-    + df_ocorrencias["mes"].astype(str).str.zfill(2)
-)
-
-# AGREGAÇÃO
-df_plot = (
-    df_ocorrencias
-    .groupby("ano_mes")
-    .size()
-    .reset_index(name="quantidade")
-    .sort_values("ano_mes")
-)
-
-# PLOT PADRONIZADO
-bar_timeseries(
-    df=df_plot,
-    x="ano_mes",
-    y="quantidade",
-    title="Ocorrências registradas por mês",
-    COLORS=COLORS, 
-    xlabel = "Ano-Mês"
-)
-```
-
-**Por outro lado, observa-se que, em relação aos dias da semana, 39.5% das ocorrências foram registradas durante o final de semana. Um possível motivo para é o maior tempo de convívio familiar nesses dias**
-
-```{python}
-# PREPARAÇÃO DOS DADOS
-df_semana = df.copy()
-
-# cria coluna datetime apenas para cálculo
-# cria coluna datetime apenas para cálculo
-df_semana["data"] = pd.to_datetime(
-    dict(
-        year=df_semana["ano"],
-        month=df_semana["mes"],
-        day=df_semana["dia"]
-    ),
-    errors="coerce"
-)
-
-# nomes dos dias em português
-dias_semana = {
-    0: "Segunda-feira",
-    1: "Terça-feira",
-    2: "Quarta-feira",
-    3: "Quinta-feira",
-    4: "Sexta-feira",
-    5: "Sábado",
-    6: "Domingo"
-}
-
-df_semana["dia_semana"] = (
-    df_semana["data"]
-    .dt.weekday
-    .map(dias_semana)
-)
-
-
-# AGREGAÇÃO
-df_plot = (
-    df_semana
-    .groupby("dia_semana")
-    .size()
-    .reset_index(name="quantidade")
-)
-
-# ordem lógica dos dias
-ordem_dias = list(dias_semana.values())
-
-df_plot["dia_semana"] = pd.Categorical(
-    df_plot["dia_semana"],
-    categories=ordem_dias,
-    ordered=True
-)
-
-df_plot = df_plot.sort_values("dia_semana")
-
-# PLOT PADRONIZADO
-bar_vertical_temporal_highlight(
-    df=df_plot,
-    x="dia_semana",
-    y="quantidade",
-    title="Ocorrências por dia da semana",
-    COLORS=COLORS, 
-    xlabel = "Dia da Semana"
-)
-```
-
-**O horário das ocorrências reforça esse padrão: há uma concentração expressiva nos períodos noturnos, especialmente entre 20h e 23h, o que é compatível com o momento de maior convívio doméstico entre vítima e agressor. Nessa mesma janela horária, observa-se a maior incidência de ocorrências associadas ao consumo de álcool, com pico às 21h — dado que converge com a análise por dia da semana e sugere que o agravamento noturno não é apenas circunstancial, mas frequentemente potencializado pelo uso de substâncias psicoativas — terminologia mais abrangente utilizada pela Organização Mundial da Saúde - OMS e literatura médica.**
-
-```{python}
-# PREPARAÇÃO DOS DADOS
-df_hora = df.copy()
-
-# garante tipo numérico
-df_hora["hora"] = pd.to_numeric(df_hora["hora"], errors="coerce")
-
-df_hora = df_hora.dropna(subset=["hora"])
-
-# AGREGAÇÃO
-df_plot = (
-    df_hora
-    .groupby("hora")
-    .size()
-    .reset_index(name="quantidade")
-    .sort_values("hora")
-)
-
-horas_completas = pd.DataFrame({"hora": range(24)})
-
-df_plot = (
-    horas_completas
-    .merge(df_plot, on="hora", how="left")
-    .fillna(0)
-)
-
-df_plot["quantidade"] = df_plot["quantidade"].astype(int)
-
-# PLOT PADRONIZADO
-
-line_chart(
-    df=df_plot,
-    x="hora",
-    y="quantidade",
-    title="Ocorrências por hora do dia",
-    COLORS=COLORS, 
-    xlabel="Hora do dia"
-)
-```
-
-# Tipos de violência
-
-A violência contra a mulher pode ser classificada em 5 diferentes tipos:
-
--   Física
--   Psicológica
--   Moral
--   Sexual
--   Patrimonial
-
-**Nas ocorrências analisadas, observa-se que mais de 70% dos casos envolvem violência física ou patrimonial**
-
-Nas ocorrências analisadas, mais de 70% dos casos envolvem violência física ou patrimonial. Esse dado, porém, deve ser interpretado com cautela: categorias como violência psicológica, moral e sexual tendem a ser subnotificadas nos registros policiais, uma vez que dificilmente motivam, por si sós, o acionamento da Polícia Militar. A menor representatividade dessas categorias nos dados reflete, portanto, uma limitação do canal de registro — não necessariamente sua menor ocorrência na realidade.
-
-```{python}
-
-# PREPARAÇÃO DOS DADOS
-df_violencia = df.copy()
-
-cols_violencia = [
-    "v_fisica",
-    "v_psicologica",
-    "v_patrimonial",
-    "v_sexual",
-    "v_moral"
-]
-
-# AGREGAÇÃO
-df_plot = (
-    df_violencia[cols_violencia]
-    .sum()
-    .reset_index()
-)
-
-df_plot.columns = ["tipo_violencia", "quantidade"]
-
-# nomes amigáveis para relatório
-map_labels = {
-    "v_fisica": "Violência Física",
-    "v_psicologica": "Violência Psicológica",
-    "v_patrimonial": "Violência Patrimonial",
-    "v_sexual": "Violência Sexual",
-    "v_moral": "Violência Moral"
-}
-
-df_plot["tipo_violencia"] = df_plot["tipo_violencia"].map(map_labels)
-
-# PLOT PADRONIZADO
-bar_horizontal_highlight(
-    df=df_plot,
-    x="tipo_violencia",
-    y="quantidade",
-    title="Tipos de violência mais frequentes nas ocorrências",
-    COLORS=COLORS, 
-    ylabel = "Tipo de violência"
-)
-```
-
-Além disso, é possível e muito provável que haja coocorrências de diferentes tipos de violência no mesmo caso
-
-```{python}
-
-```
-
-# Fatores Associados
-
-**Mais de 30% das ocorrências estão associadas a pelo menos um fator agravante, como consumo de álcool ou drogas, descumprimento de medida protetiva ou término recente de relacionamento. Desse total, os dois fatores mais recorrentes — consumo de álcool (≈ 12%) e descumprimento de medida protetiva (≈ 11%) — respondem juntos por cerca de 23% das ocorrências analisadas.[**
-
-**Consumo de álcool ou descumprimento de medida protetiva são fatores presentes em cerca de 23% das ocorrências analisadas**
-
-```{python}
-def bar_horizontal_highlight(
-    df,
-    x,
-    y,
-    title,
-    COLORS
-):
-
-    from matplotlib.ticker import FuncFormatter
-
-    df_plot = df.sort_values(y, ascending=True)
-
-    colors = _highlight_colors(df_plot[y].values, COLORS)
-
-    plt.figure(figsize=(8, 5))
-
-    ax = plt.barh(
-        df_plot[x],
-        df_plot[y],
-        color=colors
-    )
-
-    plt.yticks(rotation=0)
-    plt.xticks(rotation=0)
-
-    _setup_axes(title, xlabel=y, ylabel=x)
-
-    # formata eixo em percentual brasileiro
-    plt.gca().xaxis.set_major_formatter(
-        FuncFormatter(lambda x, _: f"{x:.1f}%".replace(".", ","))
-    )
-
-    # labels nas barras já formatados
-    for container in plt.gca().containers:
-        labels = [
-            f"{v.get_width():.1f}%".replace(".", ",")
-            for v in container
-        ]
-        plt.bar_label(container, labels=labels, padding=3)
-
-    plt.tight_layout()
-    plt.show()
-```
-
-# Consumo de álcool
-
-Este é o fator associado mais representativo dentre os dados analisados. Cerca de 12% das ocorrências estão relacionadas ao consumo de álcool. 
-Este fator foi identificado por meio de processamento de linguagem natural (NLP), buscando termos como embriaguez, bebida, cerveja, entre outros, nos históricos das ocorrências. Cerca de 12% dos registros mencionam o consumo de álcool no contexto da agressão. Contudo, o contexto apresenta uma limitação importante: esse dado reflete o que foi registrado pelo policial no B.O., e não uma constatação clínica. Casos em que houve consumo mas não foi relatado não aparecem nesta análise, o que sugere que o percentual real pode ser superior.
-**Observa-se que há uma tendência à linearidade quanto ao total de casos registrados por dia da semana** Isso sugere que ocorrências nesse contexto não estão restritas a datas comemorativas ou finais de semana. Pelo contrário, a ausência de sazonalidade indica que o consumo de álcool por parte dos agressores é constante
-
-```{python}
-# ÁLCOOL — POR DIA DA SEMANA
-df_alcool = df.copy()
-
-# filtra apenas casos com álcool
-df_alcool = df_alcool[df_alcool["flag_alcool"] == True]
-
-# cria datetime
-df_alcool["data"] = pd.to_datetime(
-    dict(
-        year=df_alcool["ano"],
-        month=df_alcool["mes"],
-        day=df_alcool["dia"]
-    ),
-    errors="coerce"
-)
-
-dias_semana = {
-    0: "Segunda-feira",
-    1: "Terça-feira",
-    2: "Quarta-feira",
-    3: "Quinta-feira",
-    4: "Sexta-feira",
-    5: "Sábado",
-    6: "Domingo"
-}
-
-df_alcool["dia_semana"] = (
-    df_alcool["data"].dt.weekday.map(dias_semana)
-)
-
-df_plot_semana = (
-    df_alcool
-    .groupby("dia_semana")
-    .size()
-    .reset_index(name="quantidade")
-)
-
-ordem = list(dias_semana.values())
-
-df_plot_semana["dia_semana"] = pd.Categorical(
-    df_plot_semana["dia_semana"],
-    categories=ordem,
-    ordered=True
-)
-
-df_plot_semana = df_plot_semana.sort_values("dia_semana")
-
-bar_vertical_temporal_highlight(
-    df=df_plot_semana,
-    x="dia_semana",
-    y="quantidade",
-    title="Ocorrências com consumo de álcool por dia da semana",
-    COLORS=COLORS
-)
-
-# ======================================
-# ÁLCOOL — POR MÊS
-meses = {
-    1: "Janeiro",
-    2: "Fevereiro",
-    3: "Março",
-    4: "Abril",
-    5: "Maio",
-    6: "Junho",
-    7: "Julho",
-    8: "Agosto",
-    9: "Setembro",
-    10: "Outubro",
-    11: "Novembro",
-    12: "Dezembro"
-}
-
-df_plot_mes = (
-    df_alcool
-    .groupby("mes")
-    .size()
-    .reset_index(name="quantidade")
-)
-
-df_plot_mes["mes_nome"] = df_plot_mes["mes"].map(meses)
-
-df_plot_mes = df_plot_mes.sort_values("mes")
-
-bar_timeseries(
-    df=df_plot_mes,
-    x="mes_nome",
-    y="quantidade",
-    title="Ocorrências com consumo de álcool por mês",
-    COLORS=COLORS, 
-    xlabel = "Mês"
-)
-```
-
-**Por outro lado, as ocorrências tendem a aumentar conforme a noite e a madrugada chegam**
-
-```{python}
-# ÁLCOOL — POR HORA DO DIA
-
-df_plot_hora = (
-    df_alcool
-    .groupby("hora")
-    .size()
-    .reset_index(name="quantidade")
-    .sort_values("hora")
-)
-
-line_chart(
-    df=df_plot_hora,
-    x="hora",
-    y="quantidade",
-    title="Ocorrências com consumo de álcool por hora do dia",
-    COLORS=COLORS, 
-    xlabel = "Hora do dia"
-)
-```
-
-# Descumprimento de medida protetiva
-
-Este é o segundo fator mais relevante nos dados analisados. Cerca de 11% das ocorrências envolviam o descumprimento de medida protetiva
-
-**Os descumprimentos de medida protetiva também ocorrerem, em sua maioria, aos fins de semana**
-
-```{python}
-# MEDIDA PROTETIVA — POR DIA DA SEMANA
-df_medida_protetiva = df.copy()
-
-# filtra apenas casos com medida protetiva ativa
-df_medida_protetiva = df_medida_protetiva[df_medida_protetiva["flag_medida_protetiva"] == True]
-
-# cria datetime
-df_medida_protetiva["data"] = pd.to_datetime(
-    dict(
-        year=df_medida_protetiva["ano"],
-        month=df_medida_protetiva["mes"],
-        day=df_medida_protetiva["dia"]
-    ),
-    errors="coerce"
-)
-
-dias_semana = {
-    0: "Segunda-feira",
-    1: "Terça-feira",
-    2: "Quarta-feira",
-    3: "Quinta-feira",
-    4: "Sexta-feira",
-    5: "Sábado",
-    6: "Domingo"
-}
-
-df_medida_protetiva["dia_semana"] = (
-    df_medida_protetiva["data"].dt.weekday.map(dias_semana)
-)
-
-df_plot_semana = (
-    df_medida_protetiva
-    .groupby("dia_semana")
-    .size()
-    .reset_index(name="quantidade")
-)
-
-ordem = list(dias_semana.values())
-
-df_plot_semana["dia_semana"] = pd.Categorical(
-    df_plot_semana["dia_semana"],
-    categories=ordem,
-    ordered=True
-)
-
-df_plot_semana = df_plot_semana.sort_values("dia_semana")
-
-bar_vertical_temporal_highlight(
-    df=df_plot_semana,
-    x="dia_semana",
-    y="quantidade",
-    title="Ocorrências com descumprimento de medida protetiva por dia da semana",
-    COLORS=COLORS,
-    xlabel = "Dia da semana"
-)
-
-# ======================================
-# MEDIDA PROTETIVA — POR MÊS
-meses = {
-    1: "Janeiro",
-    2: "Fevereiro",
-    3: "Março",
-    4: "Abril",
-    5: "Maio",
-    6: "Junho",
-    7: "Julho",
-    8: "Agosto",
-    9: "Setembro",
-    10: "Outubro",
-    11: "Novembro",
-    12: "Dezembro"
-}
-
-df_plot_mes = (
-    df_medida_protetiva
-    .groupby("mes")
-    .size()
-    .reset_index(name="quantidade")
-)
-
-df_plot_mes["mes_nome"] = df_plot_mes["mes"].map(meses)
-
-df_plot_mes = df_plot_mes.sort_values("mes")
-
-bar_timeseries(
-    df=df_plot_mes,
-    x="mes_nome",
-    y="quantidade",
-    title="Ocorrências com descumprimento de medida protetiva por mês",
-    COLORS=COLORS, 
-    xlabel = "Mês"
-)
-```
-
-**Além disso, o horário comercial também ganha destaque devido à quantidade de ocorrências registradas nesse período**
-
-```{python}
-# MEDIDA PROTETIVA — POR HORA DO DIA
-
-df_plot_hora = (
-    df_medida_protetiva
-    .groupby("hora")
-    .size()
-    .reset_index(name="quantidade")
-    .sort_values("hora")
-)
-
-line_chart(
-    df=df_plot_hora,
-    x="hora",
-    y="quantidade",
-    title="Ocorrências com descumprimento de medida protetiva por hora do dia",
-    COLORS=COLORS
-)
-```
-
-**Por outro lado, observa-se que a participação desse fator dentro do total de ocorrências diárias se comporta de maneira inversa à do consumo alcoólico**
-
-```{python}
-# ==============================
-# PREPARAÇÃO
-# ==============================
-
-df_semana = df.copy()
-# cria data válida
-df_semana["data"] = pd.to_datetime(
-    dict(
-        year=df_semana["ano"],
-        month=df_semana["mes"],
-        day=df_semana["dia"]
-    ),
-    errors="coerce"
-)
-
-# ==============================
-# DIA DA SEMANA (PT-BR)
-# ==============================
-
-dias_semana = {
-    0: "Segunda-feira",
-    1: "Terça-feira",
-    2: "Quarta-feira",
-    3: "Quinta-feira",
-    4: "Sexta-feira",
-    5: "Sábado",
-    6: "Domingo"
-}
-
-df_semana["dia_semana"] = (
-    df_semana["data"]
-    .dt.weekday
-    .map(dias_semana)
-)
-
-# ==============================
-# CÁLCULO DO PERCENTUAL
-# ==============================
-
-df_plot = (
-    df_semana
-    .groupby("dia_semana")["flag_alcool"]
-    .mean()                # ← proporção
-    .mul(100)              # ← percentual
-    .reset_index(name="percentual")
-)
-
-# ordem lógica dos dias
-ordem_dias = list(dias_semana.values())
-
-df_plot["dia_semana"] = pd.Categorical(
-    df_plot["dia_semana"],
-    categories=ordem_dias,
-    ordered=True
-)
-
-df_plot = df_plot.sort_values("dia_semana")
-
-# ==============================
-# PLOT
-# ==============================
-
-bar_vertical_temporal_highlight(
-    df=df_plot,
-    x="dia_semana",
-    y="percentual",
-    title="Percentual de ocorrências com consumo de álcool por dia da semana",
-    COLORS=COLORS,
-    xlabel = "Dia da semana"
-)
-
-# ==============================
-# PREPARAÇÃO
-# ==============================
-
-df_semana = df.copy()
-
-# cria data válida
-df_semana["data"] = pd.to_datetime(
-    dict(
-        year=df_semana["ano"],
-        month=df_semana["mes"],
-        day=df_semana["dia"]
-    ),
-    errors="coerce"
-)
-
-dias_semana = {
-    0: "Segunda-feira",
-    1: "Terça-feira",
-    2: "Quarta-feira",
-    3: "Quinta-feira",
-    4: "Sexta-feira",
-    5: "Sábado",
-    6: "Domingo"
-}
-
-df_semana["dia_semana"] = (
-    df_semana["data"]
-    .dt.weekday
-    .map(dias_semana)
-)
-
-df_plot = (
-    df_semana
-    .groupby("dia_semana")["flag_medida_protetiva"]
-    .mean()                # ← proporção
-    .mul(100)              # ← percentual
-    .reset_index(name="percentual")
-)
-
-# ordem lógica dos dias
-ordem_dias = list(dias_semana.values())
-
-df_plot["dia_semana"] = pd.Categorical(
-    df_plot["dia_semana"],
-    categories=ordem_dias,
-    ordered=True
-)
-
-df_plot = df_plot.sort_values("dia_semana")
-
-# PLOT
-
-bar_vertical_temporal_highlight(
-    df=df_plot,
-    x="dia_semana",
-    y="percentual",
-    title="Percentual de ocorrências com descumprimento de medida protetiva por dia da semana",
-    COLORS=COLORS, 
-    xlabel = "Dia da semana"
-)
-```
-
-# Reiteração e Ciclo de Violência
-
-A análise de reiteração é o termômetro do **"enxugamento de gelo"** no policiamento ostensivo. Para contornar a imprecisão natural dos aparelhos de GPS das viaturas (que podem variar alguns metros), a clusterização não foi feita por coordenadas, mas sim por meio de **engenharia de texto** cruzando a Quadra e o Complemento (ex: "QNN 06 CASA 31").
-
-**Os dados revelam uma realidade alarmante: centenas de lares acionaram o 190 repetidas vezes em um curto espaço de tempo, indicando falhas na rede de proteção contínua.**
-
-## Análise de Reincidência por Endereço
-
-```{python}
-#| label: fig-reincidencia
-#| fig-cap: "Volume de Endereços por Frequência de Reincidência da PMDF"
-#| fig-align: center
-
-from utils.report_plots import bar_horizontal_highlight
-
-# PREPARAÇÃO DOS DADOS: REINCIDÊNCIA
-df_reincidencia = df.copy()
-
-# Recriando a coluna de endereço (pois ela havia sido descartada para limpar o CSV)
-df_reincidencia['COMPLEMENTO_CLEAN'] = df_reincidencia['complemento'].fillna('').str.upper()
-df_reincidencia['QUADRA_CLEAN'] = df_reincidencia['quadra'].fillna('').str.upper()
-df_reincidencia['ENDERECO_BUSCA'] = df_reincidencia['cidade'].fillna('').str.upper() + " " + df_reincidencia['QUADRA_CLEAN'] + " " + df_reincidencia['COMPLEMENTO_CLEAN']
-
-# Focamos em residências
-df_casas = df_reincidencia[df_reincidencia['TIPO_MORADIA'].isin(['CASA', 'APARTAMENTO'])]
-
-# 1. Conta quantos chamados teve CADA endereço único
-contagem_por_endereco = df_casas['ENDERECO_BUSCA'].value_counts()
-
-# 2. Filtra apenas os reincidentes (que ligaram mais de 1 vez)
-enderecos_reincidentes = contagem_por_endereco[contagem_por_endereco > 1]
-
-# 3. Conta QUANTAS CASAS tiveram X chamados
-distribuicao_reincidencia = (
-    enderecos_reincidentes
-    .value_counts()
-    .rename_axis('Qtd_Chamados_no_Mesmo_Endereco') # Nomeia a coluna do eixo X
-    .reset_index(name='Total_de_Enderecos')        # Nomeia a coluna do eixo Y
-)
-
-distribuicao_reincidencia = distribuicao_reincidencia.sort_values('Qtd_Chamados_no_Mesmo_Endereco')
-
-# Trocando para string para o gráfico de barras ficar categórico
-distribuicao_reincidencia['Qtd_Chamados_no_Mesmo_Endereco'] = distribuicao_reincidencia['Qtd_Chamados_no_Mesmo_Endereco'].astype(str) + " Chamados"
-
-# PLOT (Usando a identidade visual oficial do grupo)
-bar_horizontal_highlight(
-    df=distribuicao_reincidencia.tail(5), # Pegando os top 5 níveis de reincidência
-    x="Qtd_Chamados_no_Mesmo_Endereco",
-    y="Total_de_Enderecos",
-    title="Volume de Endereços por Frequência de Reincidência da PMDF",
-    COLORS=COLORS,
-    xlabel="Total de Endereços",
-    ylabel="Frequência"
-)
-```
-
-> **Nota Analítica**: Identificamos mais de 400 lares no Distrito Federal que exigiram múltiplas intervenções policiais no mesmo ano. A simples ocorrência de um segundo chamado (que representa a esmagadora maioria dos casos) já evidencia falhas na rede de proteção contínua. Estes locais demandam encaminhamento ativo e urgente para o **PROVID** (Prevenção Orientada à Violência Doméstica), pois a probabilidade de um desfecho fatal escala drasticamente a cada nova viatura acionada.
-
-## Análise Geoespacial: O Vácuo de Policiamento
-
-Para responder à pergunta **"O policiamento está onde o crime acontece?"**, o território do Distrito Federal foi clusterizado em uma grade espacial de **500x500 metros**. Isso permitiu a criação de um mapa de calor preciso de chamados 190.
-
-Ao sobrepor as localizações exatas dos Batalhões da PMDF (representados como escudos azuis) à nossa grade de risco, identificamos **"Pontos Cegos"**. São áreas de densidade demográfica elevada com alta incidência criminal, mas que estão geograficamente distantes da base de prontidão mais próxima.
-
-![](../docs/print_pontos_cegos.png){fig-align="center"}
-
-## A Ponta do Iceberg: O Cruzamento com Feminicídios
-
-O trabalho ostensivo da PMDF (Chamados 190) lida com a prevenção e o flagrante. O desfecho fatal, no entanto, é investigado pela Polícia Civil (PCDF).
-
-Para validar a eficácia da nossa clusterização de risco, cruzamos as ocorrências da **Lei Maria da Penha** (PMDF) com dados oficiais de **230 feminicídios consumados** mapeados pela SSP-DF.
-
-**O insight mais grave do projeto**: Os casos de feminicídio (bolhas vermelhas) ocorrem majoritariamente nas mesmas áreas geográficas (RAs e quadrantes) que o nosso algoritmo já havia classificado como de alto risco com base nos chamados rotineiros do 190.
-
-Isso valida empiricamente a nossa tese preditiva: **a mancha de chamados emergenciais "antecipa" a mancha do feminicídio**.
-
-![](../docs/print_feminicidios.png){fig-align="center"}
-
-# Integração complementar: SINAN × PMDF
-
-## Por que as bases não são unidas caso a caso
-
-Além dos atendimentos da PMDF, foi analisada a base do **SINAN — Sistema de Informação de Agravos de Notificação**. Ela registra notificações feitas por serviços de saúde, enquanto a PMDF registra chamados e atendimentos policiais. Portanto, um mesmo episódio pode aparecer nas duas fontes, em apenas uma delas ou em nenhuma.
-
-Não foi realizado cruzamento por pessoa, endereço, protocolo ou texto livre. A integração ocorre apenas no nível agregado de mês e de indicadores, preservando a privacidade e evitando inferências indevidas. O recorte SINAN utilizado contempla mulheres, ocorrência no DF e violência não autoprovocada confirmada.
-
-Em 2024, o recorte resultou em **3.112 notificações SINAN**, frente a **12.123 atendimentos PMDF**. O SINAN bruto contém 35.745 registros; foram identificadas 440 datas de ocorrência ausentes ou inválidas e cinco duplicatas exatas, mantidas rastreáveis na camada tratada.
-
-```{python}
-#| label: tbl-perfil-comparativo-sinan-pmdf
-#| tbl-cap: "Composição dos indicadores em PMDF e SINAN (2024)"
-
+#| label: setup
+import sys
 from pathlib import Path
-from IPython.display import display
 
-integration_dir = Path("../outputs/sinan_integracao")
-comparison_path = integration_dir / "perfil_comparativo_pmdf_sinan_2024.csv"
-monthly_path = integration_dir / "pmdf_sinan_mensal_2024.csv"
-lag_path = integration_dir / "correlacoes_defasadas_pmdf_sinan_2024.csv"
-recurrence_path = integration_dir / "reincidencia_conceitos_2024.csv"
+import numpy as np
+import pandas as pd
+from scipy import stats
 
-if not all(path.exists() for path in [comparison_path, monthly_path, lag_path, recurrence_path]):
-    raise FileNotFoundError(
-        "Saídas da integração ausentes. Execute `python main.py` antes de renderizar este relatório."
-    )
+RAIZ = next(p for p in [Path.cwd(), *Path.cwd().parents] if (p / "main.py").exists())
+sys.path.insert(0, str(RAIZ / "src"))
 
-df_comparativo = pd.read_csv(comparison_path, encoding="utf-8-sig")
-df_mensal_integracao = pd.read_csv(monthly_path, encoding="utf-8-sig")
-df_lags = pd.read_csv(lag_path, encoding="utf-8-sig")
-df_reincidencia_conceitos = pd.read_csv(recurrence_path, encoding="utf-8-sig")
+from utils import report_figures as rf
+from utils import report_stats as rs
+from utils.report_theme import set_report_theme
 
-tabela_perfil = df_comparativo[
-    [
-        "rotulo",
-        "pmdf_percentual",
-        "sinan_percentual_entre_validas",
-        "sinan_ignorado_ou_vazio",
-    ]
-].copy()
-tabela_perfil.columns = [
-    "Indicador",
-    "PMDF (% dos atendimentos)",
-    "SINAN (% entre respostas válidas)",
-    "SINAN: ignorado/vazio (n)",
+COLORS = set_report_theme()
+fp, fn = rs.formatar_pct, rs.formatar_num
+
+
+def frp(r, chave="rp"):
+    """Razão com IC, para uso entre parênteses: '1,39; IC 95%: 1,32–1,46'."""
+    return f"{fn(r[chave], 2)}; IC 95%: {fn(r['ic_inf'], 2)}–{fn(r['ic_sup'], 2)}"
+
+
+MESES_EXTENSO = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho",
+                 "agosto", "setembro", "outubro", "novembro", "dezembro"]
+
+
+def fpv(p):
+    return "p < 0,001" if p < 0.001 else f"p = {fn(p, 3)}"
+
+
+df = pd.read_csv(RAIZ / "data" / "base_analisada.csv", low_memory=False)
+df["dt"] = pd.to_datetime(df["data hora"])
+df["data_registro"] = pd.to_datetime(df["numero"].astype(str).str[:8], format="%Y%m%d")
+df["dia_semana"] = df["dt"].dt.weekday
+df["hora"] = df["dt"].dt.hour
+df["fim_de_semana"] = df["dia_semana"] >= 5
+df["palavras"] = df["historico_limpo"].fillna("").str.split().str.len()
+N = len(df)
+
+VIOLENCIAS = {
+    "v_fisica": "Física", "v_psicologica": "Psicológica", "v_patrimonial": "Patrimonial",
+    "v_moral": "Moral", "v_sexual": "Sexual",
+}
+FATORES = {
+    "flag_separacao": "Separação ou ex-parceiro", "flag_alcool": "Álcool",
+    "flag_medida_protetiva": "Medida protetiva (menção)", "flag_drogas": "Drogas",
+    "flag_arma_branca": "Arma branca", "flag_filhos": "Filhos", "flag_arma_fogo": "Arma de fogo",
+    "flag_tornozeleira": "Tornozeleira eletrônica",
+}
+```
+
+```{python}
+#| label: calculos
+# ---------- Qualidade e cobertura ----------
+geo = df["id_celula"].notna()
+cobertura_ra = df.groupby("cidade")["id_celula"].apply(lambda s: s.notna().mean())
+cobertura_ra_grandes = cobertura_ra[df["cidade"].value_counts() > 200]
+ras_boa_cobertura = cobertura_ra_grandes[cobertura_ra_grandes >= 0.6].index
+lacunas = [l for l in rs.lacunas_de_registro(df["data_registro"]) if l[0].year == 2024]
+atraso = (df["data_registro"] - df["dt"].dt.normalize()).dt.days
+setembro = df["dt"].dt.month == 9
+media_set = setembro.sum() / 30
+media_outros = (~setembro).sum() / (366 - 30)
+iguais = df["historico_limpo"].fillna("").duplicated(keep=False) & (df["palavras"] > 0)
+duplo_registro = iguais & (df["palavras"] >= 30)
+texto_padrao = iguais & (df["palavras"] < 30)
+
+# ---------- Tempo ----------
+diario = df["dt"].dt.normalize().value_counts().reindex(pd.date_range("2024-01-01", "2024-12-31"), fill_value=0)
+tab_mes, teste_mes = rs.distribuicao_calendario(df["dt"], "mes")
+sem_set = tab_mes[tab_mes["categoria"] != "Set"]
+teste_mes_sem_set = stats.chisquare(sem_set["observado"], sem_set["esperado"] / sem_set["esperado"].sum() * sem_set["observado"].sum())
+tab_sem, teste_sem = rs.distribuicao_calendario(df["dt"], "dia_semana")
+fds = tab_sem["categoria"].isin(["Sábado", "Domingo"])
+rr_fds = rs.razao_taxas(tab_sem.loc[fds, "observado"].sum(), tab_sem.loc[fds, "dias"].sum(),
+                        tab_sem.loc[~fds, "observado"].sum(), tab_sem.loc[~fds, "dias"].sum())
+dias_fds_ano = tab_sem.loc[fds, "dias"].sum() / tab_sem["dias"].sum()
+noite = df["hora"].between(20, 23)
+hora_pico = df["hora"].value_counts().idxmax()
+minuto_zero = (df["dt"].dt.minute == 0).mean()
+meia_noite = ((df["hora"] == 0) & (df["dt"].dt.minute == 0)).sum()
+dias_por_semana = tab_sem.set_index("categoria")["dias"]
+matriz_hora = (
+    pd.crosstab(df["dia_semana"].map(dict(enumerate(rs.DIAS_SEMANA))), df["hora"])
+    .reindex(rs.DIAS_SEMANA)
+    .div(dias_por_semana, axis=0)
+)
+noite_domingo = matriz_hora.loc["Domingo", 19:22]
+madrugada = matriz_hora.loc[:, 0:4].mean(axis=1)
+meia_noite_na_hora_0 = meia_noite / (df["hora"] == 0).sum()
+# Dias afetados pela lacuna de registro: a contagem diária só se recupera no fim de setembro.
+periodo_afetado = pd.date_range("2024-09-05", "2024-09-30")
+tab_fer, ef_fer = rs.efeito_datas(df["dt"], rs.FERIADOS_2024, dias_excluidos=periodo_afetado)
+tab_com, ef_com = rs.efeito_datas(df["dt"], rs.DATAS_COMEMORATIVAS_2024, dias_excluidos=periodo_afetado)
+# Feriado em dia útil cria um dia de convívio a mais; feriado no fim de semana, não.
+_, ef_fer_util = rs.efeito_datas(df["dt"], {d: n for d, n in rs.FERIADOS_2024.items() if d.weekday() < 5}, dias_excluidos=periodo_afetado)
+_, ef_fer_fds = rs.efeito_datas(df["dt"], {d: n for d, n in rs.FERIADOS_2024.items() if d.weekday() >= 5}, dias_excluidos=periodo_afetado)
+
+# ---------- Formas de violência e fatores ----------
+prev_viol = pd.DataFrame([{"rotulo": r, **rs.prevalencia(df, c)} for c, r in VIOLENCIAS.items()])
+prev_fat = pd.DataFrame([{"rotulo": r, **rs.prevalencia(df, c)} for c, r in FATORES.items()])
+pv = prev_viol.set_index("rotulo")["p"]
+alguma_violencia = df[list(VIOLENCIAS)].any(axis=1).mean()
+pares, n_tipos = rs.coocorrencia(df, list(VIOLENCIAS))
+dois_ou_mais = (n_tipos[n_tipos.index >= 2].sum()) / N
+fis_psi = pares.loc["v_fisica", "v_psicologica"]
+algum_fator = df[["flag_alcool", "flag_drogas", "flag_medida_protetiva", "flag_separacao"]].any(axis=1).mean()
+menciona_descumprimento = df["historico_limpo"].fillna("").str.contains(r"\bdescumpr")
+descumpr_entre_mp = menciona_descumprimento[df["flag_medida_protetiva"]].mean()
+
+# ---------- Associações: bruta e ajustada pelo tamanho do histórico ----------
+df["decil_palavras"] = pd.qcut(df["palavras"], 10, labels=False, duplicates="drop")
+palavras_alcool = df.loc[df["flag_alcool"], "palavras"].median()
+palavras_sem = df.loc[~df["flag_alcool"], "palavras"].median()
+ASSOCIACOES = [
+    ("flag_alcool", "v_fisica", "Álcool → violência física"),
+    ("flag_alcool", "v_psicologica", "Álcool → violência psicológica"),
+    ("flag_alcool", "v_patrimonial", "Álcool → violência patrimonial"),
+    ("flag_alcool", "v_moral", "Álcool → violência moral"),
+    ("flag_drogas", "v_fisica", "Drogas → violência física"),
+    ("flag_arma_fogo", "v_psicologica", "Arma de fogo → violência psicológica"),
+    ("flag_separacao", "flag_medida_protetiva", "Separação → medida protetiva"),
 ]
-tabela_perfil["PMDF (% dos atendimentos)"] = tabela_perfil["PMDF (% dos atendimentos)"].map(lambda value: f"{value:.2f}%")
-tabela_perfil["SINAN (% entre respostas válidas)"] = tabela_perfil["SINAN (% entre respostas válidas)"].map(lambda value: f"{value:.2f}%")
-display(tabela_perfil.style.hide(axis="index"))
+linhas = []
+for exp, out, rotulo in ASSOCIACOES:
+    b = rs.razao_prevalencia(df, exp, out)
+    a = rs.razao_prevalencia_mh(df, exp, out, "decil_palavras")
+    linhas.append({"rotulo": rotulo, "bruta_rp": b["rp"], "bruta_inf": b["ic_inf"], "bruta_sup": b["ic_sup"],
+                   "ajustada_rp": a["rp"], "ajustada_inf": a["ic_inf"], "ajustada_sup": a["ic_sup"]})
+assoc = pd.DataFrame(linhas).set_index("rotulo", drop=False)
+
+
+def frp_assoc(rotulo, serie="ajustada"):
+    r = assoc.loc[rotulo]
+    return frp({"rp": r[f"{serie}_rp"], "ic_inf": r[f"{serie}_inf"], "ic_sup": r[f"{serie}_sup"]})
+
+
+
+rp_alc_fis_b = rs.razao_prevalencia(df, "flag_alcool", "v_fisica")
+rp_alc_fis_a = rs.razao_prevalencia_mh(df, "flag_alcool", "v_fisica", "decil_palavras")
+
+# ---------- Fatores no tempo ----------
+rp_alcool_fds = rs.razao_prevalencia(df, "fim_de_semana", "flag_alcool")
+ind_alcool_dia = rs.independencia(df, "dia_semana", "flag_alcool")
+df["noite"] = noite
+rp_alcool_noite = rs.razao_prevalencia(df, "noite", "flag_alcool")
+rp_mp_fds = rs.razao_prevalencia(df, "fim_de_semana", "flag_medida_protetiva")
+ind_mp_dia = rs.independencia(df, "dia_semana", "flag_medida_protetiva")
+df["horario_comercial"] = df["hora"].between(8, 17)
+rp_mp_comercial = rs.razao_prevalencia(df, "horario_comercial", "flag_medida_protetiva")
+mp_fds_share = df.loc[df["flag_medida_protetiva"], "fim_de_semana"].mean()
+
+# ---------- Desfecho e local ----------
+desfecho = df["desfecho"].value_counts(normalize=True)
+df["encaminhado_dp"] = df["desfecho"].eq("encaminhado_dp")
+local = df["TIPO_MORADIA"].value_counts(normalize=True)
+
+# ---------- Repetição de chamados por endereço ----------
+df["chave_endereco"] = (df["cidade"].fillna("").str.upper() + " " + df["quadra"].fillna("").str.upper()
+                        + " " + df["complemento"].fillna("").str.upper())
+residencial = df[df["TIPO_MORADIA"].isin(["CASA", "APARTAMENTO"])]
+contagem_end = residencial["chave_endereco"].value_counts()
+recorrentes = contagem_end[contagem_end > 1]
+dist_recorrencia = recorrentes.value_counts().sort_index()
+intervalos = rs.intervalos_entre_chamados(residencial[residencial["chave_endereco"].isin(recorrentes.index)], "chave_endereco", "dt")
+retornos = intervalos[intervalos >= 1]
+ocorr_end_repetido = (df["reincidencia_endereco"] > 1).mean()
 ```
 
-As diferenças de composição não estimam prevalência na população. Elas revelam, sobretudo, que cada canal registra dimensões diferentes do fenômeno: a violência sexual aparece em 37,95% das respostas válidas do SINAN e em 0,37% dos atendimentos PMDF; já o uso de objeto perfurocortante tem proporções semelhantes, 7,96% e 7,75%, respectivamente. A variável de álcool exige cautela adicional, pois 1.341 notificações SINAN do recorte não possuem resposta válida para esse campo.
+# Sumário executivo {.unnumbered}
+
+- **`{python} fn(N)` ocorrências** da Lei Maria da Penha atendidas pela PMDF em 2024 compõem a base. As formas de violência e os fatores de contexto foram extraídos das narrativas policiais e indicam o que o policial **registrou**, não necessariamente tudo o que ocorreu.
+- **O fim de semana concentra a demanda.** Sábados e domingos têm, em média, `{python} fn(rr_fds["rr"], 2)` vezes mais ocorrências por dia que os dias úteis, e `{python} fp(noite.mean())` dos atendimentos ocorrem entre 20h e 23h, contra 16,7% esperados se o horário fosse indiferente.
+- **Feriados em dias úteis elevam a demanda.** Tiveram `{python} fp(ef_fer_util["razao"] - 1, 0)` mais ocorrências que o mesmo dia da semana nas semanas vizinhas, excesso semelhante ao do fim de semana. Feriados que caem no sábado ou no domingo e datas comemorativas sem feriado (Dia das Mães, Dia dos Namorados, vésperas de Natal e Ano-Novo) não diferiram do padrão.
+- **A violência registrada é múltipla.** A violência física aparece em `{python} fp(pv["Física"])` das ocorrências, a psicológica em `{python} fp(pv["Psicológica"])` e a patrimonial em `{python} fp(pv["Patrimonial"])`. Em `{python} fp(dois_ou_mais)` dos registros há duas ou mais formas simultâneas.
+- **Parte da associação entre álcool e violência é efeito do texto.** Narrativas que citam álcool são mais longas (mediana de `{python} fn(palavras_alcool)` contra `{python} fn(palavras_sem)` palavras). Ajustada pelo tamanho do histórico, a razão de prevalência entre álcool e violência física cai de `{python} fn(rp_alc_fis_b["rp"], 2)` para `{python} fn(rp_alc_fis_a["rp"], 2)`.
+- **A demanda é concentrada no espaço, mas os mapas são parciais.** Entre as ocorrências com coordenada válida (`{python} fp(geo.mean())` do total), `{python} fp(rs.concentracao(df["id_celula"].dropna().value_counts().values)[1]["unidades_para_50pct"] / df["id_celula"].nunique())` das células de 500 m concentram metade dos registros. A cobertura de GPS, porém, varia de `{python} fp(cobertura_ra_grandes.min(), 0)` a `{python} fp(cobertura_ra_grandes.max(), 0)` entre as RAs.
+- **Há uma lacuna de registro em setembro.** Não há nenhuma ocorrência registrada no sistema entre `{python} lacunas[0][0].strftime("%d/%m")` e `{python} lacunas[0][1].strftime("%d/%m")`. A queda de setembro é, portanto, um artefato de registro, e não uma redução da violência.
+
+# Dados, definições e qualidade
+
+## Unidade de análise e leitura dos indicadores
+
+A unidade de análise é a **ocorrência policial**, não a vítima. Uma mesma mulher pode figurar em vários registros, e episódios não comunicados à PMDF não estão na base. Os resultados descrevem, portanto, a **demanda que chegou ao policiamento ostensivo**, e não a prevalência da violência no Distrito Federal.
+
+As formas de violência e os fatores de contexto foram extraídos do histórico por regras de processamento de linguagem natural, com tratamento de negação ("não agrediu", "não possui medida protetiva"). Uma flag positiva significa que o termo foi **mencionado** na narrativa; uma flag negativa significa "não identificado", e não "ausente". As regras e suas limitações estão descritas na metodologia do projeto.
+
+## Qualidade da base
 
 ```{python}
-#| label: fig-composicao-sinan-pmdf
-#| fig-cap: "Composição dos indicadores nas duas fontes (2024)"
-#| fig-align: center
-
-plot_comparativo = df_comparativo.sort_values("pmdf_percentual")
-fig, ax = plt.subplots(figsize=(10, 5.5))
-y = np.arange(len(plot_comparativo))
-ax.barh(y - 0.18, plot_comparativo["pmdf_percentual"], height=0.36, label="PMDF (% dos atendimentos)", color=COLORS["primary"])
-ax.barh(y + 0.18, plot_comparativo["sinan_percentual_entre_validas"], height=0.36, label="SINAN (% entre respostas válidas)", color=COLORS["secondary"])
-ax.set_yticks(y)
-ax.set_yticklabels(plot_comparativo["rotulo"])
-ax.set_xlabel("Percentual")
-ax.set_title("Indicadores registrados por fonte — bases não diretamente equivalentes")
-ax.legend(frameon=False)
-ax.grid(axis="x", alpha=0.2)
-plt.tight_layout()
-plt.show()
+#| label: tbl-qualidade
+#| tbl-cap: "Indicadores de qualidade da base PMDF"
+#| output: asis
+qualidade = pd.DataFrame([
+    ["Ocorrências", fn(N), "Data do fato entre 01/01 e 31/12/2024"],
+    ["Registro no mesmo dia do fato", fp((atraso == 0).mean()), f"{fn((atraso > 30).sum())} registradas mais de 30 dias depois"],
+    ["Coordenada utilizável (grade 500 m)", fp(geo.mean()), "Demais na coordenada-padrão do sistema ou sem coordenada"],
+    ["Horário em minuto cheio (hh:00)", fp(minuto_zero), f"1,7% esperado; {fn(meia_noite)} registros às 0h00"],
+    ["Narrativas idênticas longas (≥ 30 palavras)", fn(duplo_registro.sum()), "Provável duplo registro do mesmo atendimento"],
+    ["Textos curtos padronizados", fn(texto_padrao.sum()), "Narrativas repetidas sem descrição do fato"],
+    ["Dias sem nenhum registro no sistema", fn(sum(l[2] for l in lacunas)), " e ".join(f"{a.strftime('%d/%m')} a {b.strftime('%d/%m')}" for a, b, _ in lacunas)],
+], columns=["Indicador", "Valor", "Observação"])
+print(rs.tabela_markdown(qualidade))
 ```
 
-## Sazonalidade e associação temporal
+Três pontos condicionam toda a leitura a seguir:
 
-Os picos mensais não coincidem: a PMDF atingiu seu maior volume em março (1.188 atendimentos), enquanto o SINAN atingiu o maior volume em setembro (322 notificações). Para comparar apenas o desenho sazonal, o gráfico abaixo mostra a participação de cada mês no total anual da respectiva fonte.
+1. **Lacuna de registro em setembro.** O número da ocorrência codifica a data de registro. Entre `{python} lacunas[0][0].strftime("%d/%m")` e `{python} lacunas[0][1].strftime("%d/%m")` de 2024 não há nenhum registro, e os fatos desse período aparecem depois, em volume reduzido. Setembro teve `{python} fn(media_set, 1)` ocorrências por dia, contra `{python} fn(media_outros, 1)` nos demais meses. A falha de sistema ou de extração precisa ser confirmada com a PMDF; até lá, setembro não deve ser lido como queda da violência.
+2. **Georreferenciamento parcial e desigual.** Só `{python} fp(geo.mean())` das ocorrências têm coordenada utilizável, e a proporção varia de `{python} fp(cobertura_ra_grandes.min(), 0)` (`{python} rs.nome_ra(cobertura_ra_grandes.idxmin())`) a `{python} fp(cobertura_ra_grandes.max(), 0)` (`{python} rs.nome_ra(cobertura_ra_grandes.idxmax())`) entre as RAs com mais de 200 ocorrências (@fig-cobertura). Os mapas mostram onde a posição da viatura foi registrada, e não toda a demanda.
+3. **Duplicidades.** Cerca de `{python} fp((duplo_registro | texto_padrao).mean())` dos registros são narrativas repetidas. O efeito máximo sobre qualquer proporção deste relatório é de cerca de um ponto percentual.
+
+# Padrões temporais
+
+## Ao longo do ano
 
 ```{python}
-#| label: fig-sazonalidade-sinan-pmdf
-#| fig-cap: "Participação mensal no total anual de cada fonte (2024)"
-#| fig-align: center
-
-meses_pt = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
-plot_mensal = df_mensal_integracao.copy()
-plot_mensal["mes_nome"] = meses_pt
-plot_mensal["PMDF"] = plot_mensal["pmdf_volume_total"] / plot_mensal["pmdf_volume_total"].sum() * 100
-plot_mensal["SINAN"] = plot_mensal["sinan_primaria_volume_total"] / plot_mensal["sinan_primaria_volume_total"].sum() * 100
-
-fig, ax = plt.subplots(figsize=(10, 4.8))
-ax.plot(plot_mensal["mes_nome"], plot_mensal["PMDF"], marker="o", label="PMDF", color=COLORS["primary"])
-ax.plot(plot_mensal["mes_nome"], plot_mensal["SINAN"], marker="o", label="SINAN", color=COLORS["secondary"])
-ax.set_ylabel("Participação no total anual (%)")
-ax.set_xlabel("Mês")
-ax.set_title("Sazonalidade relativa das fontes")
-ax.legend(frameon=False)
-ax.grid(alpha=0.2)
-plt.tight_layout()
-plt.show()
+#| label: fig-serie-diaria
+#| fig-cap: "Ocorrências por dia em 2024. A faixa marca o período sem nenhum registro no sistema."
+rf.serie_diaria(diario, lacunas, COLORS, "Ocorrências por dia, 2024");
 ```
 
-As correlações mensais no mesmo período foram fracas e sem significância estatística: para o volume total, Pearson foi -0,4047 (*p*=0,1920). Também foram avaliadas defasagens de -3 a +3 meses. Embora uma combinação isolada tenha apresentado *p* bruto menor que 0,05, nenhum dos 49 testes permaneceu significativo após ajuste de Benjamini-Hochberg. Não há evidência para interpretar uma fonte como antecedente temporal da outra.
+A distribuição mensal **não é uniforme**, mesmo considerando o número de dias de cada mês (qui-quadrado = `{python} fn(teste_mes["qui2"], 1)`; `{python} fpv(teste_mes["p"])`). Março teve o maior volume relativo (`{python} fp(tab_mes.set_index("categoria").loc["Mar", "razao_obs_esp"] - 1, 0)` acima do esperado). Setembro teve o menor, explicado pela lacuna de registro. Sem setembro, a heterogeneidade persiste (`{python} fpv(teste_mes_sem_set.pvalue)`), mas com amplitude menor: os demais meses variam entre `{python} fp(sem_set["razao_obs_esp"].min() - 1, 0)` e +`{python} fp(sem_set["razao_obs_esp"].max() - 1, 0)` em relação ao esperado. Com um único ano de dados, não é possível separar sazonalidade de flutuação específica de 2024.
 
-## Reiteração: métricas distintas
+## Dias da semana e horário
 
 ```{python}
-#| label: tbl-reiteracao-conceitos
-#| tbl-cap: "Métricas de reiteração — conceitos não comparáveis"
-
-tabela_reiteracao = df_reincidencia_conceitos[
-    ["fonte", "conceito", "numerador", "denominador_valido", "percentual", "observacao"]
-].copy()
-tabela_reiteracao.columns = ["Fonte", "Métrica", "Casos", "Base válida", "Percentual", "Interpretação"]
-tabela_reiteracao["Percentual"] = tabela_reiteracao["Percentual"].map(lambda value: f"{value:.2f}%")
-display(tabela_reiteracao.style.hide(axis="index"))
+#| label: fig-dia-semana
+#| fig-cap: "Média de ocorrências por dia, segundo o dia da semana (2024 tem 53 segundas e terças)."
+rf.barras_media_diaria(tab_sem, COLORS, "Ocorrências por dia, segundo o dia da semana", destaque=["Sábado", "Domingo"]);
 ```
 
-A PMDF registra repetição espacial de endereço (13,61% dos atendimentos), enquanto o SINAN registra histórico de violência informado na notificação (57,41% das respostas válidas). As métricas não representam a mesma pessoa, unidade de análise ou período e, por isso, não foram correlacionadas.
+Sábado e domingo reúnem `{python} fp(df["fim_de_semana"].mean())` das ocorrências, contra `{python} fp(dias_fds_ano)` dos dias do ano. Por dia, a demanda do fim de semana é `{python} fn(rr_fds["rr"], 2)` vezes a dos dias úteis (IC 95%: `{python} fn(rr_fds["ic_inf"], 2)`–`{python} fn(rr_fds["ic_sup"], 2)`). O domingo é o dia de maior demanda (`{python} fn(tab_sem.set_index("categoria").loc["Domingo", "media_diaria"], 1)` ocorrências por dia).
 
-> **Síntese da integração:** SINAN e PMDF se complementam para descrever canais distintos de atendimento à violência contra a mulher. Os resultados devem ser usados para investigar padrões agregados e qualificar políticas públicas, e não para estimar prevalência, subnotificação ou risco individual.
+```{python}
+#| label: fig-hora-dia
+#| fig-cap: "Média de ocorrências por dia em cada hora e dia da semana."
+rf.heatmap_hora_dia(matriz_hora, COLORS, "Ocorrências por hora e dia da semana (média por dia)");
+```
 
-# Conclusões e Próximos Passos
+O horário de maior demanda é `{python} hora_pico`h, e a faixa das 20h às 23h concentra `{python} fp(noite.mean())` das ocorrências, contra 16,7% esperados sob distribuição uniforme. A @fig-hora-dia mostra onde essa demanda se acumula:
 
-## Achados Principais
+- **Noite de domingo.** É o pico da semana: das 19h às 22h, cada hora teve em média `{python} fn(noite_domingo.min(), 1)` a `{python} fn(noite_domingo.max(), 1)` ocorrências por domingo. A noite de sábado vem em seguida.
+- **Madrugada.** Entre 0h e 4h, a madrugada de `{python} madrugada.idxmax().lower()` é a mais movimentada da semana (`{python} fn(madrugada.max(), 1)` ocorrências por hora, contra `{python} fn(madrugada.drop(["Sábado", "Domingo"]).mean(), 1)` nos dias úteis).
+- **Virada de domingo para segunda.** A 0h de segunda-feira (`{python} fn(matriz_hora.loc["Segunda-feira", 0], 1)`) se iguala à de domingo, como continuação da noite de domingo.
 
--   **A violência tem horário e local**: A agressão em contexto doméstico explode em períodos de recolhimento (noite/madrugada e finais de semana), sendo fortemente agravada pelo álcool.
--   **A ineficácia do patrulhamento reativo**: A alta reincidência em endereços fixos demonstra que o mero despacho de viaturas após o crime não rompe o ciclo da violência.
--   **Prova de Conceito (PoC) Concluída**: A estruturação desta base (enriquecida com NLP e dados geoespaciais) está pronta para o treinamento de modelos de Machine Learning.
+O padrão é coerente com os períodos de maior convívio doméstico.
 
-## Roadmap ML
+Há arredondamento de horário: `{python} fp(minuto_zero)` dos registros terminam em minuto cheio, e `{python} fn(meia_noite)` estão às 0h00 exatas, o que sugere uso desse horário como valor-padrão. Esses registros são `{python} fp(meia_noite_na_hora_0)` da hora 0h, que fica levemente inflada; nas demais faixas o efeito é desprezível.
 
-Se alimentados com a base histórica completa (últimos 5 anos), os algoritmos poderão prever estatisticamente em quais quadrantes (Células de 500m) ocorrerão os próximos crimes no turno subsequente, permitindo à PMDF migrar de um modelo de patrulhamento de ronda para um **policiamento preditivo de altíssima precisão**.
+## Feriados e datas comemorativas
+
+Cada data foi comparada com a média do mesmo dia da semana nas quatro semanas anteriores e posteriores, o que controla o efeito do dia da semana e da época do ano. Os dias de 05/09 a 30/09, afetados pela lacuna de registro, foram excluídos da comparação.
+
+```{python}
+#| label: tbl-feriados
+#| tbl-cap: "Ocorrências em feriados e datas comemorativas de 2024, comparadas ao mesmo dia da semana nas semanas vizinhas"
+#| output: asis
+t = pd.concat([tab_fer.assign(tipo="Feriado"), tab_com.assign(tipo="Comemorativa")])
+t = t.assign(
+    Data=[d.strftime("%d/%m") + " (" + rs.DIAS_SEMANA[d.weekday()][:3].lower() + ")" for d in t["data"]],
+    Observado=t["observado"].map(fn),
+    Esperado=t["esperado"].map(lambda v: fn(v, 1)),
+    Razão=[("excluída" if e else fn(o / esp, 2)) for o, esp, e in zip(t["observado"], t["esperado"], t["excluida"])],
+)[["Data", "nome", "tipo", "Observado", "Esperado", "Razão"]].rename(columns={"nome": "Data festiva", "tipo": "Tipo"})
+print(rs.tabela_markdown(t))
+```
+
+`{python} " e ".join(tab_fer.loc[tab_fer["excluida"], "nome"])` caiu no período da lacuna de registro e ficou fora do total. No conjunto, os feriados tiveram `{python} fn(ef_fer["observado"])` ocorrências, contra `{python} fn(ef_fer["esperado"], 0)` esperadas, uma razão de `{python} fn(ef_fer["razao"], 2)` (IC 95%: `{python} fn(ef_fer["ic_inf"], 2)`–`{python} fn(ef_fer["ic_sup"], 2)`). O efeito depende do dia em que o feriado cai:
+
+- **Feriados em dias úteis** tiveram razão de `{python} fn(ef_fer_util["razao"], 2)` (IC 95%: `{python} fn(ef_fer_util["ic_inf"], 2)`–`{python} fn(ef_fer_util["ic_sup"], 2)`). O excesso é próximo da razão entre fim de semana e dias úteis (`{python} fn(rr_fds["rr"], 2)`): o dia útil de folga se comporta como um domingo. Os maiores excessos foram no Natal, no Dia do Trabalho e na Confraternização Universal.
+- **Feriados no fim de semana** não diferiram do esperado (razão de `{python} frp(ef_fer_fds, "razao")`), porque não acrescentam tempo livre.
+- **Datas comemorativas sem feriado** também não diferiram do esperado (razão de `{python} frp(ef_com, "razao")`).
+
+O conjunto sustenta a leitura de que **o tempo de convívio, mais que a data em si, eleva a demanda**.
+
+# Formas de violência
+
+```{python}
+#| label: fig-violencias
+#| fig-cap: "Proporção de ocorrências com menção a cada forma de violência (art. 7º da Lei nº 11.340/2006), com IC 95%."
+rf.barras_prevalencia(prev_viol, COLORS, "Formas de violência mencionadas no histórico");
+```
+
+Ao menos uma forma de violência foi identificada em `{python} fp(alguma_violencia)` das ocorrências. As formas **se sobrepõem**: `{python} fp(dois_ou_mais)` dos registros mencionam duas ou mais, e a combinação mais frequente é física com psicológica (`{python} fn(fis_psi)` ocorrências, `{python} fp(fis_psi / N)` do total).
+
+A violência sexual (`{python} fp(pv["Sexual"])`) é residual nos registros da PMDF, em contraste com o SINAN (@sec-sinan). A violência sexual raramente motiva o acionamento da polícia ostensiva e tende a ser relatada em outros canais, como serviços de saúde e delegacias especializadas. A baixa frequência é, portanto, um traço do canal de registro, e não um indicador da sua ocorrência.
+
+# Fatores de contexto e de risco
+
+```{python}
+#| label: fig-fatores
+#| fig-cap: "Proporção de ocorrências com menção a cada fator de contexto, com IC 95%."
+rf.barras_prevalencia(prev_fat, COLORS, "Fatores de contexto mencionados no histórico");
+```
+
+`{python} fp(algum_fator)` das ocorrências mencionam ao menos um entre álcool, drogas, medida protetiva e separação. Duas ressalvas de leitura:
+
+- **Medida protetiva** indica que a medida foi **mencionada** (vigente, solicitada ou descumprida). Só `{python} fp(descumpr_entre_mp)` dessas narrativas usam o termo "descumprimento", e a flag não deve ser lida como taxa de descumprimento.
+- **Álcool** reflete a percepção registrada pelo policial, não uma constatação clínica.
+
+## Associações e o efeito do tamanho do texto
+
+Fatores como o álcool tornam a narrativa mais longa, e narrativas longas mencionam mais termos de qualquer categoria. Comparar diretamente quem tem e quem não tem a flag mistura a associação real com esse **viés de detecção**. Por isso, as razões de prevalência foram calculadas em duas versões: bruta e ajustada pelo tamanho do histórico (Mantel-Haenszel, estratos por decis do número de palavras).
+
+```{python}
+#| label: fig-associacoes
+#| fig-cap: "Razões de prevalência (IC 95%) brutas e ajustadas pelo tamanho do histórico."
+rf.forest(assoc, COLORS, "Associações entre fatores e formas de violência");
+```
+
+```{python}
+#| label: tbl-associacoes
+#| tbl-cap: "Razões de prevalência brutas e ajustadas pelo tamanho do histórico"
+#| output: asis
+t = pd.DataFrame({
+    "Associação": assoc["rotulo"],
+    "RP bruta (IC 95%)": [f"{fn(r.bruta_rp, 2)} ({fn(r.bruta_inf, 2)}–{fn(r.bruta_sup, 2)})" for r in assoc.itertuples()],
+    "RP ajustada (IC 95%)": [f"{fn(r.ajustada_rp, 2)} ({fn(r.ajustada_inf, 2)}–{fn(r.ajustada_sup, 2)})" for r in assoc.itertuples()],
+})
+print(rs.tabela_markdown(t))
+```
+
+O ajuste muda a conclusão para o álcool:
+
+- **Violência física.** A associação bruta com o álcool (RP = `{python} frp(rp_alc_fis_b)`) praticamente desaparece após o ajuste (RP = `{python} frp(rp_alc_fis_a)`). O mesmo ocorre com as drogas (RP ajustada = `{python} frp_assoc("Drogas → violência física")`). Bandiera-Paiva et al. (2026), com dados estruturados do SINAN, encontraram 1,17 para o álcool. O valor bruto da PMDF superestima a associação.
+- **Violências moral, psicológica e patrimonial.** Permanecem associadas ao álcool após o ajuste, mas atenuadas: RP ajustadas de `{python} fn(assoc.loc["Álcool → violência moral", "ajustada_rp"], 2)`, `{python} fn(assoc.loc["Álcool → violência psicológica", "ajustada_rp"], 2)` e `{python} fn(assoc.loc["Álcool → violência patrimonial", "ajustada_rp"], 2)`, respectivamente. A ofensa verbal e a ameaça sob efeito de álcool são um padrão plausível, mas as flags não distinguem quem bebeu.
+- **Arma de fogo e violência psicológica.** A associação cai, mas persiste (RP ajustada = `{python} frp_assoc("Arma de fogo → violência psicológica")`), coerente com o uso da arma como instrumento de ameaça.
+- **Separação e medida protetiva.** É a associação mais forte e a menos sensível ao ajuste (RP ajustada = `{python} frp_assoc("Separação → medida protetiva")`), coerente com o uso da medida protetiva após o rompimento.
+
+O ajuste pode ser conservador: se episódios mais graves geram relatos mais longos, ele remove também parte da associação real. As estimativas bruta e ajustada devem ser lidas em conjunto, como uma faixa plausível. Todas as associações são transversais e não autorizam leitura causal.
+
+## Álcool e medida protetiva no tempo
+
+- **Álcool.** É mais frequente no fim de semana (RP = `{python} frp(rp_alcool_fds)`) e entre 20h e 23h (RP = `{python} frp(rp_alcool_noite)`). A variação entre os dias da semana é estatisticamente significativa (`{python} fpv(ind_alcool_dia["p"])`), mas pequena (V de Cramér = `{python} fn(ind_alcool_dia["v_cramer"], 2)`).
+- **Medida protetiva.** As menções **não** se concentram no fim de semana: só `{python} fp(mp_fds_share)` delas ocorrem em sábados e domingos, e a proporção não varia entre os dias (`{python} fpv(ind_mp_dia["p"])`). São mais frequentes no horário comercial, das 8h às 17h (RP = `{python} frp(rp_mp_comercial)`), possivelmente pela procura ativa da vítima por apoio durante o dia.
+
+# Desfecho do atendimento e local
+
+O desfecho foi inferido da narrativa:
+
+- **encaminhamento à delegacia:** `{python} fp(desfecho.get("encaminhado_dp", 0))`;
+- **resolução no local** (orientação ou acordo): `{python} fp(desfecho.get("resolvido_local", 0))`;
+- **não identificado:** `{python} fp(desfecho.get("nao_identificado", 0))`. Essa parcela limita a análise do desfecho.
+
+O encaminhamento é mais frequente quando há violência física (RP = `{python} frp(rs.razao_prevalencia(df, "v_fisica", "encaminhado_dp"))`) ou arma branca (RP = `{python} frp(rs.razao_prevalencia(df, "flag_arma_branca", "encaminhado_dp"))`).
+
+Quanto ao local, obtido do endereço:
+
+- **casas:** `{python} fp(local.get("CASA", 0))` das ocorrências;
+- **apartamentos:** `{python} fp(local.get("APARTAMENTO", 0))`;
+- **via pública:** `{python} fp(local.get("VIA PUBLICA", 0))`;
+- **comércio:** `{python} fp(local.get("COMERCIO / SERVICO", 0))`;
+- **sem identificação:** `{python} fp(local.get("OUTROS / NÃO IDENTIFICADO", 0))`, porque o endereço digitado não permite classificar o local.
+
+# Repetição de chamados no mesmo endereço
+
+A repetição foi medida por uma chave textual (RA, quadra e complemento), e não pela identificação de pessoas. Ela indica **demanda recorrente sobre um local**, e não necessariamente revitimização da mesma mulher.
+
+```{python}
+#| label: tbl-recorrencia
+#| tbl-cap: "Endereços residenciais com mais de uma ocorrência em 2024"
+#| output: asis
+t = pd.DataFrame({
+    "Ocorrências no endereço": dist_recorrencia.index.astype(str),
+    "Endereços": dist_recorrencia.values,
+})
+print(rs.tabela_markdown(t))
+```
+
+`{python} fn(len(recorrentes))` endereços residenciais tiveram mais de uma ocorrência no ano, a maioria (`{python} fp(dist_recorrencia.get(2, 0) / len(recorrentes))`) com exatamente duas. Duas ressalvas impedem ler esse número como "lares com violência recorrente":
+
+- **A chave não identifica a pessoa.** Quase todos esses endereços têm número de casa ou apartamento, mas a chave pode agrupar residências distintas quando o endereço omite o conjunto ou o lote. Além disso, moradoras diferentes podem ter ocupado o mesmo imóvel.
+- **Parte é duplo registro.** `{python} fp((intervalos < 1).mean())` dos intervalos entre chamados consecutivos são menores que um dia, o que sugere duplo registro do mesmo atendimento.
+
+Excluídos os intervalos menores que um dia, a mediana entre chamados foi de `{python} fn(retornos.median())` dias, e `{python} fp((retornos <= 30).mean())` dos retornos ocorreram em até 30 dias.
+
+A literatura mostra que a repetição de chamados em um mesmo endereço é frequente e prediz novos episódios (FARRELL; PEASE, 1993; KUMAR et al., 2024). Os dados de 2024 são compatíveis com esse padrão. Medir a revitimização, porém, exige identificar a vítima, o que a base não permite.
+
+# Distribuição espacial
+
+## Concentração
+
+```{python}
+#| label: fig-concentracao
+#| fig-cap: "Curva de concentração das ocorrências nas células de 500 m com ao menos um registro."
+cont_celulas = df["id_celula"].dropna().value_counts().values
+conc, conc_info = rs.concentracao(cont_celulas)
+cont_boa_cobertura = df.loc[df["cidade"].isin(ras_boa_cobertura), "id_celula"].dropna().value_counts().values
+conc_boa, conc_boa_info = rs.concentracao(cont_boa_cobertura)
+rf.curva_concentracao(cont_celulas, COLORS, "Concentração espacial das ocorrências");
+```
+
+As ocorrências georreferenciadas distribuem-se por `{python} fn(conc_info["unidades"])` células de 500 m. Metade delas está em `{python} fn(conc_info["unidades_para_50pct"])` células (`{python} fp(conc_info["unidades_para_50pct"] / conc_info["unidades"])`), e os 5% de células mais ativas reúnem `{python} fp(conc[0.05])` dos registros (índice de Gini = `{python} fn(conc_info["gini"], 2)`).
+
+```{python}
+#| label: fig-cobertura
+#| fig-cap: "Proporção de ocorrências com coordenada utilizável, por RA (RAs com mais de 200 ocorrências)."
+t = cobertura_ra_grandes.sort_values()
+rf.barras_horizontais([rs.nome_ra(c) for c in t.index], t.values, COLORS, "Ocorrências com coordenada utilizável, por RA");
+```
+
+**A concentração deve ser lida junto com a cobertura.** Uma RA com baixa cobertura de GPS aparece "fria" no mapa mesmo com muitas ocorrências. Comparações entre RAs devem usar as contagens por RA, que são completas, e não a grade.
+
+A concentração, porém, não é só efeito da cobertura. Restrita às `{python} len(ras_boa_cobertura)` RAs com ao menos 60% das ocorrências georreferenciadas, ela persiste com intensidade um pouco menor: `{python} fp(conc_boa_info["unidades_para_50pct"] / conc_boa_info["unidades"])` das células concentram metade dos registros (Gini = `{python} fn(conc_boa_info["gini"], 2)`).
+
+## Proximidade dos batalhões
+
+```{python}
+#| label: calculo-batalhoes
+import geopandas as gpd
+grade = gpd.read_file(RAIZ / "data" / "grade_espacial_df_LIMPA.geojson").to_crs(31983)
+bat = pd.read_csv(RAIZ / "data" / "batalhoes_pmdf.csv")
+bat = gpd.GeoDataFrame(bat, geometry=gpd.points_from_xy(bat.iloc[:, 3], bat.iloc[:, 2]), crs=4326).to_crs(31983)
+grade["n"] = grade["id_celula"].map(df["id_celula"].dropna().astype(int).value_counts()).fillna(0)
+grade["dist_km"] = grade.geometry.centroid.apply(lambda c: bat.distance(c).min() / 1000)
+rho_bat, p_bat = stats.spearmanr(grade["n"], grade["dist_km"])
+top = grade.nlargest(int(np.ceil(len(grade) * 0.05)), "n")
+mw_bat = stats.mannwhitneyu(top["dist_km"], grade.drop(top.index)["dist_km"])
+top_longe = top[top["dist_km"] > 5]
+com_celula = df.dropna(subset=["id_celula"])
+ra_celula = com_celula.groupby(com_celula["id_celula"].astype(int))["cidade"].agg(lambda s: s.mode().iat[0])
+ras_longe = top_longe["id_celula"].map(ra_celula).map(rs.nome_ra).value_counts()
+```
+
+Para verificar se as áreas de maior demanda ficam distantes das unidades da PMDF, calculou-se a distância do centro de cada célula ao batalhão mais próximo.
+
+- **No conjunto das células,** não há relação monotônica entre demanda e distância (correlação de Spearman = `{python} fn(rho_bat, 2)`; `{python} fpv(p_bat)`).
+- **No topo da distribuição,** as 5% de células mais ativas estão, em mediana, mais distantes de um batalhão: `{python} fn(top["dist_km"].median(), 1)` km, contra `{python} fn(grade.drop(top.index)["dist_km"].median(), 1)` km nas demais (Mann-Whitney, `{python} fpv(mw_bat.pvalue)`). `{python} fn(len(top_longe))` dessas `{python} fn(len(top))` células ficam a mais de 5 km, principalmente em `{python} ", ".join(ras_longe.index[:3])`.
+
+O resultado identifica um conjunto pequeno de áreas de alta demanda relativamente afastadas das sedes, candidatas a uma análise de tempo de resposta. Não demonstra "vácuo de policiamento": a sede do batalhão não é o ponto de partida das viaturas, que patrulham em movimento, e não foram usados dados de população nem de tempo de atendimento.
+
+## Comparação com os feminicídios por RA
+
+```{python}
+#| label: calculo-feminicidios
+from unidecode import unidecode
+ALIAS_RA = {
+    "BRASILIA": "PLANO PILOTO", "SUDOESTE/OCTOGONAL": "SUDOESTE", "SCIA/ESTRUTURAL": "SCIA E ESTRUTURAL",
+    "SIA": "SIA (SETOR DE INDUSTRIA E ABASTECIMENTO)", "JARDIM BOTANICO A": "JARDIM BOTANICO",
+    "JARDIM BOTANICO B": "JARDIM BOTANICO", "PARK WAY A": "PARK WAY", "PARK WAY B": "PARK WAY",
+    # RAs criadas em 2019 que a PMDF ainda registra na RA de origem.
+    "ARNIQUEIRAS": "AGUAS CLARAS", "POR DO SOL/SOL NASCENTE": "CEILANDIA",
+}
+norm = lambda s: ALIAS_RA.get(unidecode(str(s)).strip().upper(), unidecode(str(s)).strip().upper())
+fem = pd.read_csv(RAIZ / "data" / "feminicidios_pcdf.csv", encoding="latin1", sep=";")
+fem["ano"] = pd.to_datetime(fem["Data do Crime"], dayfirst=True, errors="coerce").dt.year
+por_ra = pd.concat([df["cidade"].map(norm).value_counts().rename("pmdf"), fem["RA"].map(norm).value_counts().rename("fem")], axis=1).fillna(0)
+rho_fem, p_fem = stats.spearmanr(por_ra["pmdf"], por_ra["fem"])
+```
+
+```{python}
+#| label: fig-feminicidios
+#| fig-cap: "Ocorrências PMDF (2024) e feminicídios consumados (2015–2025) por RA."
+rf.dispersao_rotulada(por_ra["pmdf"].values, por_ra["fem"].values, [rs.nome_ra(r) for r in por_ra.index], COLORS,
+                      "Ocorrências da PMDF e feminicídios por RA", "Ocorrências PMDF em 2024", "Feminicídios, 2015–2025");
+```
+
+As RAs com mais ocorrências na PMDF também concentram mais feminicídios (correlação de Spearman = `{python} fn(rho_fem, 2)`; `{python} fpv(p_fem)`; `{python} fn(len(por_ra))` RAs). A leitura exige cautela:
+
+- **Tamanho da população.** Ambas as contagens crescem com a população da RA, e sem taxas por habitante a correlação reflete, em boa parte, esse tamanho.
+- **Períodos e resoluções distintos.** Os feminicídios (`{python} fn(len(fem))` casos entre `{python} int(fem["ano"].min())` e `{python} int(fem["ano"].max())`) não têm coordenadas e cobrem um período diferente do da PMDF.
+
+Os dados indicam **convergência territorial no nível de RA**. Não permitem afirmar que a demanda da PMDF "antecipa" os feminicídios, nem validar a grade de 500 m como preditora deles. Para isso seriam necessárias taxas por população, a localização dos casos e uma série histórica comum.
+
+# Integração complementar: SINAN × PMDF {#sec-sinan}
+
+```{python}
+#| label: dados-sinan
+integracao = RAIZ / "outputs" / "sinan_integracao"
+arquivos = {k: integracao / v for k, v in {
+    "perfil": "perfil_comparativo_pmdf_sinan_2024.csv", "mensal": "pmdf_sinan_mensal_2024.csv",
+    "lags": "correlacoes_defasadas_pmdf_sinan_2024.csv", "reiteracao": "reincidencia_conceitos_2024.csv",
+}.items()}
+if not all(p.exists() for p in arquivos.values()):
+    raise FileNotFoundError("Saídas da integração ausentes. Execute `python main.py` antes de renderizar este relatório.")
+perfil = pd.read_csv(arquivos["perfil"], encoding="utf-8-sig")
+mensal = pd.read_csv(arquivos["mensal"], encoding="utf-8-sig")
+lags = pd.read_csv(arquivos["lags"], encoding="utf-8-sig")
+reiteracao = pd.read_csv(arquivos["reiteracao"], encoding="utf-8-sig")
+perfil_ix = perfil.set_index("rotulo")
+sinan_total = int(mensal["sinan_primaria_volume_total"].sum())
+r_todos = stats.pearsonr(mensal["pmdf_volume_total"], mensal["sinan_primaria_volume_total"])
+sem_setembro = mensal.drop(index=8)
+r_sem_set = stats.pearsonr(sem_setembro["pmdf_volume_total"], sem_setembro["sinan_primaria_volume_total"])
+col_p_ajustado = next(c for c in lags.columns if "ajust" in c or "bh" in c.lower())
+lags_significativos = int((lags[col_p_ajustado] < 0.05).sum())
+mes_pico_pmdf = rs.MESES[int(mensal["pmdf_volume_total"].idxmax())]
+mes_pico_sinan = rs.MESES[int(mensal["sinan_primaria_volume_total"].idxmax())]
+```
+
+O SINAN registra notificações de violência feitas por serviços de saúde. A PMDF registra atendimentos policiais. Um mesmo episódio pode estar nas duas fontes, em uma ou em nenhuma. As bases não compartilham identificador de pessoa, por isso a comparação é **apenas agregada** (por mês e por indicador), sem nenhum cruzamento caso a caso. Em 2024, o recorte do SINAN (mulheres, ocorrência no DF, violência não autoprovocada) somou `{python} fn(sinan_total)` notificações, frente a `{python} fn(N)` ocorrências da PMDF.
+
+```{python}
+#| label: tbl-perfil-sinan
+#| tbl-cap: "Composição dos indicadores na PMDF e no SINAN (2024)"
+#| output: asis
+t = perfil[["rotulo", "pmdf_percentual", "sinan_percentual_entre_validas", "sinan_ignorado_ou_vazio"]].copy()
+t.columns = ["Indicador", "PMDF (% das ocorrências)", "SINAN (% das respostas válidas)", "SINAN: ignorado ou vazio (n)"]
+for c in t.columns[1:3]:
+    t[c] = t[c].map(lambda v: fp(v / 100))
+t[t.columns[3]] = t[t.columns[3]].map(lambda v: fn(v))
+print(rs.tabela_markdown(t))
+```
+
+```{python}
+#| label: fig-perfil-sinan
+#| fig-cap: "Composição dos indicadores nas duas fontes (2024). As bases não são diretamente equivalentes."
+p = perfil.sort_values("pmdf_percentual")
+rf.barras_pareadas(list(p["rotulo"]), (p["pmdf_percentual"] / 100).tolist(), (p["sinan_percentual_entre_validas"] / 100).tolist(),
+                   ("PMDF (% das ocorrências)", "SINAN (% das respostas válidas)"), COLORS, "Indicadores por fonte");
+```
+
+As diferenças refletem o que cada canal registra, e não a prevalência na população. A violência sexual aparece em `{python} fp(perfil_ix.loc[perfil_ix.index.str.contains("sexual", case=False)].iloc[0]["sinan_percentual_entre_validas"] / 100)` das notificações válidas do SINAN e em `{python} fp(pv["Sexual"])` das ocorrências da PMDF. A violência psicológica, ao contrário, é mais registrada pela PMDF. O álcool mostra a diferença entre campo estruturado e texto livre: no SINAN, a suspeita de uso pelo autor é uma pergunta da ficha e aparece em `{python} fp(perfil_ix.loc[perfil_ix.index.str.contains("álcool", case=False)].iloc[0]["sinan_percentual_entre_validas"] / 100)` das respostas válidas; na PMDF, depende de o policial mencioná-lo e aparece em `{python} fp(perfil_ix.loc[perfil_ix.index.str.contains("álcool", case=False)].iloc[0]["pmdf_percentual"] / 100)`. A flag textual provavelmente subestima a presença do álcool.
+
+```{python}
+#| label: fig-sazonalidade-sinan
+#| fig-cap: "Participação de cada mês no total anual de cada fonte (2024). Setembro da PMDF está afetado pela lacuna de registro."
+rf.linhas_comparadas(
+    rs.MESES,
+    {"PMDF": (mensal["pmdf_volume_total"] / mensal["pmdf_volume_total"].sum() * 100).tolist(),
+     "SINAN": (mensal["sinan_primaria_volume_total"] / mensal["sinan_primaria_volume_total"].sum() * 100).tolist()},
+    COLORS, "Sazonalidade relativa das fontes", "Participação no total anual (%)",
+    notas={("PMDF", 8): "lacuna de\nregistro"},
+);
+```
+
+Os picos não coincidem: `{python} MESES_EXTENSO[rs.MESES.index(mes_pico_pmdf)]` na PMDF e `{python} MESES_EXTENSO[rs.MESES.index(mes_pico_sinan)]` no SINAN. A correlação mensal de volume foi `{python} fn(r_todos.statistic, 2)` (`{python} fpv(r_todos.pvalue)`), mas esse valor é **dominado pela lacuna de registro de setembro**. Sem setembro, a correlação passa a `{python} fn(r_sem_set.statistic, 2)` (`{python} fpv(r_sem_set.pvalue)`). Nas defasagens de −3 a +3 meses, `{python} "nenhum" if lags_significativos == 0 else fn(lags_significativos)` dos `{python} len(lags)` testes `{python} "permaneceu significativo" if lags_significativos <= 1 else "permaneceram significativos"` após o ajuste de Benjamini-Hochberg. Com 12 observações mensais, não há evidência de que uma fonte anteceda a outra.
+
+```{python}
+#| label: tbl-reiteracao
+#| tbl-cap: "Métricas de reiteração em cada fonte (conceitos não comparáveis)"
+#| output: asis
+t = reiteracao[["fonte", "conceito", "numerador", "denominador_valido", "percentual"]].copy()
+t.columns = ["Fonte", "Métrica", "Casos", "Base válida", "Percentual"]
+t["Casos"] = t["Casos"].map(fn)
+t["Base válida"] = t["Base válida"].map(fn)
+t["Percentual"] = t["Percentual"].map(lambda v: fp(v / 100))
+print(rs.tabela_markdown(t))
+```
+
+A PMDF mede a repetição de endereço; o SINAN, o histórico de violência informado na notificação. As métricas não se referem à mesma pessoa nem à mesma unidade e, por isso, não foram correlacionadas.
+
+# Limitações
+
+1. **Registros, não prevalência.** A base reflete a demanda que chegou à PMDF em um único ano, com a ocorrência como unidade.
+2. **Indicadores textuais.** As flags dependem do que o policial escreveu e da cobertura dos dicionários. Ainda não há amostra anotada manualmente para estimar precisão e sensibilidade das regras, e o tamanho da narrativa enviesa as associações brutas.
+3. **Lacuna de registro.** De 06/09 a 16/09/2024 não há registros no sistema. A causa precisa ser confirmada com a PMDF.
+4. **Georreferenciamento.** Cerca de metade das ocorrências não tem coordenada utilizável, com forte desigualdade entre RAs.
+5. **Ausência de população.** Sem denominadores populacionais por RA, comparações territoriais são de volume, não de risco.
+6. **Desfecho.** Não foi identificado em `{python} fp(desfecho.get("nao_identificado", 0))` das narrativas.
+
+# Conclusões e próximos passos
+
+- **A demanda tem padrão temporal claro.** Concentra-se nas noites e nos fins de semana e cresce nos feriados que caem em dias úteis. É informação diretamente utilizável no planejamento de escalas.
+- **A violência registrada é múltipla, com predomínio da física e da psicológica.** A violência sexual é quase ausente nos registros policiais e aparece no SINAN, o que reforça a complementaridade dos canais.
+- **Associações extraídas de texto precisam de ajuste pelo tamanho da narrativa.** Sem ele, o álcool parece associado a todas as formas de violência. Ajustada, a associação com a violência física é próxima de nula, enquanto as com violência psicológica e moral persistem.
+- **A grade de 500 m ainda não serve como base preditiva.** Ela organiza a demanda espacialmente, mas a cobertura desigual de GPS a enviesa. Qualquer modelo deve partir das contagens por RA, que são completas, e usar a grade só nas RAs com boa cobertura.
+
+**Próximos passos priorizados:**
+
+1. Confirmar com a PMDF a lacuna de setembro e o significado da coordenada-padrão.
+2. Anotar manualmente uma amostra de históricos para medir a precisão das flags.
+3. Obter a população por RA (PDAD/IPEDF) para calcular taxas.
+4. Solicitar 2022–2023 para modelar a demanda por RA e semana com mais de um ciclo anual.
+5. Obter o tempo de resposta por ocorrência para avaliar as células de alta demanda distantes dos batalhões.
+
+# Referências {.unnumbered}
+
+BANDIERA-PAIVA, P. et al. Uso de inteligência artificial para análise da violência contra mulheres em São Paulo. **Revista de Saúde Pública**, v. 60, e28, 2026.
+
+BRASIL. Lei nº 11.340, de 7 de agosto de 2006 (Lei Maria da Penha).
+
+FARRELL, G.; PEASE, K. **Once bitten, twice bitten**: repeat victimisation and its implications for crime prevention. London: Home Office, 1993.
+
+KUMAR, S. et al. Domestic abuse hot spots: a longitudinal, place-based analysis of 13 years of initial reports to the police. **Policing: A Journal of Policy and Practice**, v. 18, paae056, 2024.
