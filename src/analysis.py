@@ -2,7 +2,7 @@ import pandas as pd
 import spacy
 import os
 from tqdm import tqdm
-from src.utils.nlp_engines import extrair_flags_regex, extrair_tipos_spacy, extrair_flags_adicionais
+from src.utils.nlp_engines import extrair_flags_regex, extrair_tipos_spacy, extrair_flags_adicionais, normalizar_para_nlp
 
 def realizar_analise():
     caminho_in = os.path.join("data", "base_espacial.csv")
@@ -21,12 +21,14 @@ def realizar_analise():
     
     resultados_finais = []
     textos = df['historico_limpo'].tolist()
+    # O spaCy recebe o histórico com acentos; sem eles o modelo erra lemas e dependências.
+    textos_nlp = df['historico'].map(normalizar_para_nlp).tolist()
 
     # Processamento em Lote (nlp.pipe)
-    for i, doc in enumerate(tqdm(nlp.pipe(textos, batch_size=500), total=len(df))):
+    for i, doc in enumerate(tqdm(nlp.pipe(textos_nlp, batch_size=500), total=len(df))):
         texto_original = textos[i]
-        
-        # 1. Extração via Regex (Baseada no texto bruto)
+
+        # 1. Extração via Regex (Baseada no texto limpo)
         res_regex = extrair_flags_regex(texto_original)
         
         # 2. Extração via spaCy (Tipos de Violência)
