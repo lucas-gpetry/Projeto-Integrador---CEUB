@@ -1,5 +1,6 @@
 pandas
-numpy
+# spaCy 3.7 / thinc 8.2 são compilados contra numpy 1.x; numpy 2 quebra o import do spaCy.
+numpy<2
 scipy
 unidecode
 openpyxl
