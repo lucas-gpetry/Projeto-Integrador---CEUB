@@ -1,6 +1,6 @@
 ---
 title: "Relatório Analítico — Violência contra a Mulher no Distrito Federal"
-subtitle: "Ocorrências da Lei Maria da Penha atendidas pela PMDF em 2024"
+subtitle: "Ocorrências da Lei Maria da Penha atendidas pela PMDF e notificações do SINAN"
 author:
   - Arthur Virgílio
   - Emanuela Araújo
@@ -239,6 +239,7 @@ ocorr_end_repetido = (df["reincidencia_endereco"] > 1).mean()
 - **A violência registrada é múltipla.** A violência física aparece em `{python} fp(pv["Física"])` das ocorrências, a psicológica em `{python} fp(pv["Psicológica"])` e a patrimonial em `{python} fp(pv["Patrimonial"])`. Em `{python} fp(dois_ou_mais)` dos registros há duas ou mais formas simultâneas.
 - **Parte da associação entre álcool e violência é efeito do texto.** Narrativas que citam álcool são mais longas (mediana de `{python} fn(palavras_alcool)` contra `{python} fn(palavras_sem)` palavras). Ajustada pelo tamanho do histórico, a razão de prevalência entre álcool e violência física cai de `{python} fn(rp_alc_fis_b["rp"], 2)` para `{python} fn(rp_alc_fis_a["rp"], 2)`.
 - **A demanda é concentrada no espaço, mas os mapas são parciais.** Entre as ocorrências com coordenada válida (`{python} fp(geo.mean())` do total), `{python} fp(rs.concentracao(df["id_celula"].dropna().value_counts().values)[1]["unidades_para_50pct"] / df["id_celula"].nunique())` das células de 500 m concentram metade dos registros. A cobertura de GPS, porém, varia de `{python} fp(cobertura_ra_grandes.min(), 0)` a `{python} fp(cobertura_ra_grandes.max(), 0)` entre as RAs.
+- **O SINAN amplia o retrato.** As notificações de saúde incluem violência sexual contra meninas, ausente da demanda policial, e violência física contra mulheres adultas, em geral por parceiro. O padrão de fim de semana e noite se repete nas duas fontes, e o vínculo íntimo é o fator mais associado à violência de repetição (@sec-sinan-eda).
 - **Há uma lacuna de registro em setembro.** Não há nenhuma ocorrência registrada no sistema entre `{python} lacunas[0][0].strftime("%d/%m")` e `{python} lacunas[0][1].strftime("%d/%m")`. A queda de setembro é, portanto, um artefato de registro, e não uma redução da violência.
 
 # Dados, definições e qualidade
@@ -506,25 +507,279 @@ ALIAS_RA = {
     "ARNIQUEIRAS": "AGUAS CLARAS", "POR DO SOL/SOL NASCENTE": "CEILANDIA",
 }
 norm = lambda s: ALIAS_RA.get(unidecode(str(s)).strip().upper(), unidecode(str(s)).strip().upper())
-fem = pd.read_csv(RAIZ / "data" / "feminicidios_pcdf.csv", encoding="latin1", sep=";")
-fem["ano"] = pd.to_datetime(fem["Data do Crime"], dayfirst=True, errors="coerce").dt.year
-por_ra = pd.concat([df["cidade"].map(norm).value_counts().rename("pmdf"), fem["RA"].map(norm).value_counts().rename("fem")], axis=1).fillna(0)
-rho_fem, p_fem = stats.spearmanr(por_ra["pmdf"], por_ra["fem"])
+# A base da PCDF não é versionada; sem ela, a subseção é substituída por um aviso.
+FEM_DISPONIVEL = (RAIZ / "data" / "feminicidios_pcdf.csv").exists()
+if FEM_DISPONIVEL:
+    fem = pd.read_csv(RAIZ / "data" / "feminicidios_pcdf.csv", encoding="latin1", sep=";")
+    fem["ano"] = pd.to_datetime(fem["Data do Crime"], dayfirst=True, errors="coerce").dt.year
+    por_ra = pd.concat([df["cidade"].map(norm).value_counts().rename("pmdf"), fem["RA"].map(norm).value_counts().rename("fem")], axis=1).fillna(0)
+    rho_fem, p_fem = stats.spearmanr(por_ra["pmdf"], por_ra["fem"])
 ```
 
 ```{python}
 #| label: fig-feminicidios
 #| fig-cap: "Ocorrências PMDF (2024) e feminicídios consumados (2015–2025) por RA."
-rf.dispersao_rotulada(por_ra["pmdf"].values, por_ra["fem"].values, [rs.nome_ra(r) for r in por_ra.index], COLORS,
-                      "Ocorrências da PMDF e feminicídios por RA", "Ocorrências PMDF em 2024", "Feminicídios, 2015–2025");
+if FEM_DISPONIVEL:
+    rf.dispersao_rotulada(por_ra["pmdf"].values, por_ra["fem"].values, [rs.nome_ra(r) for r in por_ra.index], COLORS,
+                          "Ocorrências da PMDF e feminicídios por RA", "Ocorrências PMDF em 2024", "Feminicídios, 2015–2025");
 ```
 
-As RAs com mais ocorrências na PMDF também concentram mais feminicídios (correlação de Spearman = `{python} fn(rho_fem, 2)`; `{python} fpv(p_fem)`; `{python} fn(len(por_ra))` RAs). A leitura exige cautela:
+```{python}
+#| label: texto-feminicidios
+#| output: asis
+if FEM_DISPONIVEL:
+    print(f"""As RAs com mais ocorrências na PMDF também concentram mais feminicídios (correlação de Spearman = {fn(rho_fem, 2)}; {fpv(p_fem)}; {fn(len(por_ra))} RAs). A leitura exige cautela:
 
 - **Tamanho da população.** Ambas as contagens crescem com a população da RA, e sem taxas por habitante a correlação reflete, em boa parte, esse tamanho.
-- **Períodos e resoluções distintos.** Os feminicídios (`{python} fn(len(fem))` casos entre `{python} int(fem["ano"].min())` e `{python} int(fem["ano"].max())`) não têm coordenadas e cobrem um período diferente do da PMDF.
+- **Períodos e resoluções distintos.** Os feminicídios ({fn(len(fem))} casos entre {int(fem["ano"].min())} e {int(fem["ano"].max())}) não têm coordenadas e cobrem um período diferente do da PMDF.
 
 Os dados indicam **convergência territorial no nível de RA**. Não permitem afirmar que a demanda da PMDF "antecipa" os feminicídios, nem validar a grade de 500 m como preditora deles. Para isso seriam necessárias taxas por população, a localização dos casos e uma série histórica comum.
+""")
+else:
+    print("> **Seção não calculada nesta renderização:** o arquivo `data/feminicidios_pcdf.csv` (PCDF) não estava disponível.")
+```
+
+# Análise exploratória do SINAN {#sec-sinan-eda}
+
+```{python}
+#| label: dados-sinan-eda
+sys.path.insert(0, str(RAIZ))
+from src import sinan_eda as se
+
+ANO_SINAN = 2024
+_, sinan_qualidade, sb = se.preparar_coorte(RAIZ / "data" / "violencia_mulher_DF_2010_2025.csv", "coorte_pmdf_primaria")
+sf = sb[sb["ano_analitico"].eq(ANO_SINAN)].copy()
+NS, NS_ano = len(sb), len(sf)
+sq = sinan_qualidade.set_index("indicador")["valor"]
+
+# ---------- Qualidade ----------
+s_atraso = se.atraso_notificacao(sf)
+s_atraso_sex = se.atraso_notificacao(sf[sf["VIOL_SEXU"].eq("1")])
+s_atraso_outras = se.atraso_notificacao(sf[sf["VIOL_SEXU"].eq("2")])
+s_ano_seguinte = (sb["data_notificacao"].dt.year.gt(ANO_SINAN) & sb["ano_analitico"].eq(ANO_SINAN)).sum() / NS_ano
+s_comp = se.completude(sf, ["HORA_OCOR", "VIOL_MOTIV", "AUTOR_ALCO", "CS_ESCOL_N", "OUT_VEZES", "LOCAL_OCOR", "CS_RACA"]).set_index("coluna")["pct_ignorado_ou_vazio"]
+
+# ---------- Série histórica ----------
+s_anual = sb.groupby("ano_analitico").size()
+s_formas_ano = pd.DataFrame({
+    rotulo: sb[col].eq("1").groupby(sb["ano_analitico"]).sum() / sb[col].isin(["1", "2"]).groupby(sb["ano_analitico"]).sum()
+    for col, rotulo in [("VIOL_FISIC", "Física"), ("VIOL_SEXU", "Sexual"), ("VIOL_PSICO", "Psicológica/moral")]
+})
+s_ano_pre = ANO_SINAN - 1 if ANO_SINAN - 1 in s_anual.index else s_anual.index[-1]
+
+# ---------- Tempo (só datas de ocorrência; dia 1 é tratado como imputado) ----------
+s_com_data = sf[sf["fonte_data_analitica"].eq("ocorrencia")]
+s_dias_imputados = pd.date_range(f"{ANO_SINAN}-01-01", f"{ANO_SINAN}-12-31", freq="MS")
+s_datas = s_com_data.loc[~s_com_data["dia_imputado"], "data_ocorrencia"]
+s_datas_mes = s_com_data.loc[s_com_data["data_ocorrencia"].dt.strftime("%m%d").ne("0101"), "data_ocorrencia"]
+s_tab_mes, s_teste_mes = se.distribuicao_calendario(s_datas_mes, "mes", ANO_SINAN, [pd.Timestamp(f"{ANO_SINAN}-01-01")])
+s_tab_sem, s_teste_sem = se.distribuicao_calendario(s_datas, "dia_semana", ANO_SINAN, s_dias_imputados)
+s_fds = s_tab_sem["categoria"].isin(["Sábado", "Domingo"])
+s_rr_fds = rs.razao_taxas(s_tab_sem.loc[s_fds, "observado"].sum(), s_tab_sem.loc[s_fds, "dias"].sum(),
+                          s_tab_sem.loc[~s_fds, "observado"].sum(), s_tab_sem.loc[~s_fds, "dias"].sum())
+s_mes_max = s_tab_mes.loc[s_tab_mes["razao_obs_esp"].idxmax()]
+_, s_ef_fer_util = rs.efeito_datas(s_datas, {d: n for d, n in rs.FERIADOS_2024.items() if d.weekday() < 5}, dias_excluidos=s_dias_imputados)
+s_hora_informada = s_com_data["hora"].notna()
+s_com_hora = s_com_data[s_hora_informada & ~s_com_data["hora_padrao"] & ~s_com_data["dia_imputado"]]
+s_noite = s_com_hora["hora"].between(20, 23).mean()
+
+# ---------- Vítima ----------
+s_idade = sf["faixa_etaria"].value_counts(sort=False)
+s_raca = se.distribuicao(sf["CS_RACA"], se.CATEGORIAS["CS_RACA"][1]).set_index("categoria")
+s_escol = se.distribuicao(sf["CS_ESCOL_N"], se.CATEGORIAS["CS_ESCOL_N"][1], nao_se_aplica=se.NAO_SE_APLICA | {"10"}).set_index("categoria")
+s_ate_fundamental = s_escol["pct_validas"].reindex(list(se.CATEGORIAS["CS_ESCOL_N"][1].values())[:5]).sum()
+s_deficiencia = se.tabela_flags(sf, {"DEF_TRANS": "Deficiência ou transtorno"}).iloc[0]
+
+# ---------- Formas e meios ----------
+s_dom = sf[sf["recorte_domestico"]]
+s_formas = se.tabela_flags(sf, se.FORMAS_VIOLENCIA).set_index("coluna")
+s_formas_dom = se.tabela_flags(s_dom, se.FORMAS_VIOLENCIA).set_index("coluna")
+s_flags_formas = sf[list(se.FORMAS_VIOLENCIA)].eq("1")
+_, s_n_tipos = rs.coocorrencia(s_flags_formas, list(s_flags_formas.columns))
+s_dois_ou_mais = s_n_tipos[s_n_tipos.index >= 2].sum() / NS_ano
+s_sexual = sf[sf["VIOL_SEXU"].eq("1")]
+s_estupro = se.tabela_flags(s_sexual, {"SEX_ESTUPR": "Estupro"}).iloc[0]
+s_sexual_por_faixa = sf[sf["VIOL_SEXU"].isin(["1", "2"])].groupby("faixa_etaria", observed=True)["VIOL_SEXU"].apply(lambda s: s.eq("1").mean())
+s_menor = sf["idade"].lt(18)
+s_fisica_menor = sf.loc[s_menor & sf["VIOL_FISIC"].isin(["1", "2"]), "VIOL_FISIC"].eq("1").mean()
+s_fisica_adulta = sf.loc[~s_menor & sf["VIOL_FISIC"].isin(["1", "2"]), "VIOL_FISIC"].eq("1").mean()
+s_meios = se.tabela_flags(sf, se.MEIOS_AGRESSAO).set_index("coluna")
+
+# ---------- Autor, vínculo, local ----------
+s_vinculo = pd.crosstab(sf["grupo_vinculo"], np.where(s_menor, "Menos de 18 anos", "18 anos ou mais"), normalize="columns")
+s_ctx = se.tabela_flags(sf, {"AUTOR_ALCO": "Álcool", "OUT_VEZES": "Repetição"}).set_index("coluna")
+s_autor_sexo = se.distribuicao(sf["AUTOR_SEXO"], se.CATEGORIAS["AUTOR_SEXO"][1]).set_index("categoria")
+s_local = se.distribuicao(sf["LOCAL_OCOR"], se.CATEGORIAS["LOCAL_OCOR"][1], ignorados={"", "99"}).set_index("categoria")
+s_motiv = se.distribuicao(sf["VIOL_MOTIV"], se.CATEGORIAS["VIOL_MOTIV"][1]).set_index("categoria")
+s_enc = se.tabela_flags(sf, se.ENCAMINHAMENTOS)
+s_enc = s_enc[s_enc["sim"] + s_enc["nao"] > 0].set_index("rotulo")
+
+# ---------- Associações (bruta e ajustada por faixa etária) ----------
+s_assoc = se.associacoes(sf).set_index("rotulo", drop=False)
+
+
+def frp_sinan(rotulo):
+    r = s_assoc.loc[rotulo]
+    return frp({"rp": r["ajustada_rp"], "ic_inf": r["ajustada_inf"], "ic_sup": r["ajustada_sup"]})
+
+
+def frp_sinan_bruta(rotulo):
+    r = s_assoc.loc[rotulo]
+    return frp({"rp": r["bruta_rp"], "ic_inf": r["bruta_inf"], "ic_sup": r["bruta_sup"]})
+```
+
+O SINAN (Sistema de Informação de Agravos de Notificação) recebe a ficha de notificação individual de violência interpessoal e autoprovocada, preenchida por serviços de saúde e, desde 2011, de notificação compulsória. Esta seção descreve a base SINAN pelo mesmo roteiro aplicado à PMDF. O recorte é o da integração (@sec-sinan): mulheres, ocorrência no Distrito Federal (`ID_MN_OCOR = 530010`) e violência não autoprovocada confirmada (`LES_AUTOP = 2`). São `{python} fn(NS)` notificações entre `{python} int(sb["ano_analitico"].min())` e `{python} int(sb["ano_analitico"].max())`, das quais `{python} fn(NS_ano)` em `{python} ANO_SINAN`.
+
+A unidade de análise é a **notificação**, não a mulher, e as notificações descrevem a violência que **chegou a um serviço de saúde**. Diferentemente das flags da PMDF, os campos do SINAN são perguntas estruturadas da ficha: "não" e "ignorado" são respostas distintas. Por isso, as proporções a seguir são calculadas entre as respostas válidas (sim ou não), e o peso do ignorado é informado quando relevante.
+
+## Qualidade da base
+
+```{python}
+#| label: tbl-qualidade-sinan
+#| tbl-cap: "Indicadores de qualidade da base SINAN"
+#| output: asis
+t = pd.DataFrame([
+    ["Linhas na exportação recebida", fn(sq["linhas_brutas"]), "Mulheres, 2010–2025"],
+    ["Notificações na coorte analítica", fn(NS), "Ocorrência no DF e violência não autoprovocada"],
+    ["Duplicatas exatas", fn(sq["duplicatas_exatas"]), "Idênticas nas 159 colunas"],
+    [f"Notificação após 30 dias ({ANO_SINAN})", fp(s_atraso["mais_30_dias"]), f"Mediana de {fn(s_atraso['mediana'])} dias; p90 de {fn(s_atraso['p90'])} dias"],
+    [f"Data de ocorrência no dia 1 do mês ({ANO_SINAN})", fp(s_com_data["dia_imputado"].mean()), "Provável data imputada; 3,3% esperados"],
+    [f"Hora da ocorrência informada ({ANO_SINAN})", fp(s_hora_informada.mean()), f"{fp(s_com_data.loc[s_hora_informada, 'hora_padrao'].mean())} delas às 00:00"],
+    ["Motivação ignorada ou vazia", fp(s_comp["VIOL_MOTIV"]), ""],
+    ["Suspeita de álcool ignorada ou vazia", fp(s_comp["AUTOR_ALCO"]), ""],
+    ["Escolaridade ignorada ou vazia", fp(s_comp["CS_ESCOL_N"]), ""],
+    ["Raça/cor ignorada ou vazia", fp(s_comp["CS_RACA"]), ""],
+], columns=["Indicador", "Valor", "Observação"])
+print(rs.tabela_markdown(t))
+```
+
+Quatro pontos condicionam a leitura:
+
+1. **Notificação tardia.** A mediana entre a ocorrência e a notificação é de `{python} fn(s_atraso["mediana"])` dias, mas `{python} fp(s_atraso["mais_30_dias"])` das notificações de `{python} ANO_SINAN` chegaram após 30 dias. O atraso é maior na violência sexual (`{python} fp(s_atraso_sex["mais_30_dias"])` após 30 dias, contra `{python} fp(s_atraso_outras["mais_30_dias"])` nas demais), o que é compatível com revelação tardia. `{python} fp(s_ano_seguinte)` das ocorrências de `{python} ANO_SINAN` só foram notificadas no ano seguinte; o último ano da série tende, portanto, a estar subestimado.
+2. **Datas imputadas.** O dia 1 concentra cerca de três vezes mais ocorrências que os demais dias do mês, sinal de que é usado quando só o mês (ou, em 01/01, só o ano) é conhecido. Essas datas foram retiradas das análises por dia da semana e feriado, e 01/01 também da análise mensal.
+3. **Hora pouco preenchida.** Só `{python} fp(s_hora_informada.mean())` das notificações trazem a hora, e 00:00 aparece como valor-padrão. A análise de horário é, por isso, apenas indicativa.
+4. **Campos de contexto incompletos.** Motivação, suspeita de álcool e escolaridade têm entre `{python} fp(s_comp[["VIOL_MOTIV", "AUTOR_ALCO", "CS_ESCOL_N"]].min(), 0)` e `{python} fp(s_comp[["VIOL_MOTIV", "AUTOR_ALCO", "CS_ESCOL_N"]].max(), 0)` de respostas ignoradas ou vazias. Os percentuais entre respostas válidas supõem que o ignorado se distribui como as respostas conhecidas.
+
+## Série histórica
+
+```{python}
+#| label: fig-sinan-serie
+#| fig-cap: "Notificações de violência contra a mulher no SINAN, por ano de ocorrência (coorte analítica). O último ano é preliminar."
+rf.linhas_comparadas([str(a) for a in s_anual.index], {"Notificações": s_anual.tolist()}, COLORS,
+                     "Notificações de violência contra a mulher, DF", "Notificações por ano");
+```
+
+As notificações passaram de `{python} fn(s_anual.iloc[0])` em `{python} int(s_anual.index[0])` para `{python} fn(s_anual.loc[ANO_SINAN])` em `{python} ANO_SINAN`. A série cresce em degraus, com saltos em 2017 (+`{python} fp(s_anual.loc[2017] / s_anual.loc[2016] - 1, 0)`) e 2023 (+`{python} fp(s_anual.loc[2023] / s_anual.loc[2022] - 1, 0)`) e queda em 2020 (`{python} fp(s_anual.loc[2020] / s_anual.loc[2019] - 1, 0)`), primeiro ano da pandemia, quando a procura por serviços de saúde caiu. Mudanças desse porte em um ano são mais compatíveis com expansão da rede notificadora e da cultura de notificação do que com variação da violência; a série mede a **atividade de notificação**.
+
+```{python}
+#| label: fig-sinan-formas-ano
+#| fig-cap: "Proporção de notificações com cada forma de violência, por ano (% das respostas válidas)."
+rf.linhas_comparadas([str(a) for a in s_formas_ano.index], {k: (v * 100).tolist() for k, v in s_formas_ano.items()}, COLORS,
+                     "Formas de violência ao longo dos anos", "% das respostas válidas");
+```
+
+A composição mudou. A violência sexual, que respondia por `{python} fp(s_formas_ano["Sexual"].iloc[0], 0)` das notificações em `{python} int(s_formas_ano.index[0])`, caiu para `{python} fp(s_formas_ano.loc[ANO_SINAN, "Sexual"], 0)` em `{python} ANO_SINAN`, enquanto a física subiu de `{python} fp(s_formas_ano["Física"].iloc[0], 0)` para `{python} fp(s_formas_ano.loc[ANO_SINAN, "Física"], 0)`. O crescimento recente das notificações veio sobretudo da violência física, o que aproxima o perfil do SINAN daquele atendido pela polícia.
+
+## Padrões temporais em `{python} ANO_SINAN`
+
+```{python}
+#| label: fig-sinan-dia-semana
+#| fig-cap: "Média de notificações por dia de ocorrência, segundo o dia da semana (datas imputadas excluídas)."
+rf.barras_media_diaria(s_tab_sem, COLORS, "Notificações por dia, segundo o dia da semana da ocorrência",
+                       destaque=["Sábado", "Domingo"], ylabel="Notificações por dia (média)");
+```
+
+O padrão semanal é o mesmo da PMDF. Sábados e domingos têm, em média, `{python} fn(s_rr_fds["rr"], 2)` vezes mais ocorrências por dia que os dias úteis (IC 95%: `{python} fn(s_rr_fds["ic_inf"], 2)`–`{python} fn(s_rr_fds["ic_sup"], 2)`), e o domingo é o dia de maior volume (`{python} fn(s_tab_sem.set_index("categoria").loc["Domingo", "media_diaria"], 1)` por dia). Entre as notificações com hora válida, `{python} fp(s_noite)` ocorreram entre 20h e 23h, contra 16,7% esperados se o horário fosse indiferente. Duas fontes independentes, com registros feitos por profissionais diferentes, apontam para os mesmos períodos de convívio.
+
+A distribuição mensal não é uniforme (qui-quadrado = `{python} fn(s_teste_mes["qui2"], 1)`; `{python} fpv(s_teste_mes["p"])`), com maior volume relativo em `{python} MESES_EXTENSO[rs.MESES.index(s_mes_max["categoria"])]` (`{python} fp(s_mes_max["razao_obs_esp"] - 1, 0)` acima do esperado). Os feriados em dias úteis, ao contrário da PMDF, não se destacaram (razão de `{python} frp(s_ef_fer_util, "razao")`). Com cerca de oito notificações por dia, porém, o teste tem pouca precisão para efeitos de um dia.
+
+## Perfil das vítimas
+
+```{python}
+#| label: fig-sinan-idade
+#| fig-cap: "Distribuição das notificações por faixa etária da vítima."
+rf.barras_ordenadas(list(s_idade.index.astype(str)), (s_idade / s_idade.sum()).tolist(), COLORS,
+                    f"Faixa etária das vítimas ({ANO_SINAN})");
+```
+
+A principal diferença em relação à PMDF é a idade. `{python} fp(s_menor.mean())` das vítimas notificadas têm menos de 18 anos, e a faixa de 10 a 14 anos sozinha soma `{python} fp(s_idade["10–14"] / s_idade.sum())`. A mediana é de `{python} fn(sf["idade"].median())` anos. Entre as respostas válidas, `{python} fp(s_raca["pct_validas"].get("Preta", 0) + s_raca["pct_validas"].get("Parda", 0))` das vítimas são negras (pretas ou pardas), `{python} fp(s_ate_fundamental)` estudaram até o ensino fundamental completo e `{python} fp(s_deficiencia["p"])` têm alguma deficiência ou transtorno.
+
+## Formas de violência e meios de agressão
+
+Para aproximar o SINAN do escopo da Lei Maria da Penha, definiu-se um **recorte doméstico adulto**: vítimas com 18 anos ou mais agredidas por parceiro, ex-parceiro ou familiar. São `{python} fn(len(s_dom))` notificações (`{python} fp(len(s_dom) / NS_ano)` do ano).
+
+```{python}
+#| label: fig-sinan-formas
+#| fig-cap: "Formas de violência no total de notificações e no recorte doméstico adulto (% das respostas válidas)."
+s_formas_fig = ["VIOL_FISIC", "VIOL_PSICO", "VIOL_SEXU", "VIOL_NEGLI", "VIOL_FINAN"]
+rf.barras_pareadas([se.FORMAS_VIOLENCIA[c] for c in s_formas_fig][::-1], s_formas.loc[s_formas_fig[::-1], "p"].tolist(),
+                   s_formas_dom.loc[s_formas_fig[::-1], "p"].tolist(), ("Todas as notificações", "Recorte doméstico adulto"),
+                   COLORS, f"Formas de violência notificadas ({ANO_SINAN})");
+```
+
+No total, a violência física aparece em `{python} fp(s_formas.loc["VIOL_FISIC", "p"])` das notificações, a sexual em `{python} fp(s_formas.loc["VIOL_SEXU", "p"])` e a psicológica/moral em `{python} fp(s_formas.loc["VIOL_PSICO", "p"])`. Em `{python} fp(s_dois_ou_mais)` há duas ou mais formas simultâneas. O perfil depende da idade:
+
+- **Violência sexual.** Predomina na infância e na adolescência: está em `{python} fp(s_sexual_por_faixa["10–14"], 0)` das notificações de meninas de 10 a 14 anos e em `{python} fp(s_sexual_por_faixa["0–9"], 0)` das de 0 a 9 anos, contra `{python} fp(s_sexual_por_faixa["30–39"], 0)` entre 30 e 39 anos. Metade das vítimas de violência sexual (`{python} fp(s_sexual["idade"].lt(18).mean(), 0)`) tem menos de 18 anos, e o estupro é o tipo registrado em `{python} fp(s_estupro["p"])` desses casos.
+- **Violência física.** É a forma dominante na vida adulta (`{python} fp(s_fisica_adulta)` das notificações de maiores de 18 anos, contra `{python} fp(s_fisica_menor)` das de menores). No recorte doméstico adulto, chega a `{python} fp(s_formas_dom.loc["VIOL_FISIC", "p"])`, e a psicológica/moral a `{python} fp(s_formas_dom.loc["VIOL_PSICO", "p"])`, perfil próximo do registrado pela PMDF.
+
+Quanto ao meio de agressão, predominam a força corporal ou espancamento (`{python} fp(s_meios.loc["AG_FORCA", "p"])`) e a ameaça (`{python} fp(s_meios.loc["AG_AMEACA", "p"])`). Objeto perfurocortante aparece em `{python} fp(s_meios.loc["AG_CORTE", "p"])` e arma de fogo em `{python} fp(s_meios.loc["AG_FOGO", "p"])` das respostas válidas.
+
+## Autor, vínculo e local
+
+```{python}
+#| label: tbl-sinan-vinculo
+#| tbl-cap: "Vínculo do autor com a vítima, segundo a idade da vítima (% das notificações de cada faixa)"
+#| output: asis
+ordem = ["Parceiro ou ex-parceiro íntimo", "Familiar", "Conhecido(a)", "Desconhecido(a)", "Outro", "Não informado"]
+t = s_vinculo.reindex(ordem).fillna(0)
+t = pd.DataFrame({"Vínculo": t.index, **{c: t[c].map(fp) for c in ["Menos de 18 anos", "18 anos ou mais"]}})
+print(rs.tabela_markdown(t))
+```
+
+O vínculo com o autor também muda com a idade. Entre as adultas, o parceiro ou ex-parceiro íntimo é o autor em `{python} fp(s_vinculo.loc["Parceiro ou ex-parceiro íntimo", "18 anos ou mais"])` das notificações; entre as menores de 18 anos, predominam familiares (`{python} fp(s_vinculo.loc["Familiar", "Menos de 18 anos"])`) e conhecidos (`{python} fp(s_vinculo.loc["Conhecido(a)", "Menos de 18 anos"])`). O autor é do sexo masculino em `{python} fp(s_autor_sexo["pct_validas"]["Masculino"])` das respostas válidas.
+
+- **Local.** A residência é o local de `{python} fp(s_local["pct_validas"]["Residência"])` das ocorrências com local informado, e a via pública de `{python} fp(s_local["pct_validas"]["Via pública"])`.
+- **Violência de repetição.** `{python} fp(s_ctx.loc["OUT_VEZES", "p"])` das notificações com resposta válida informam que a violência já havia ocorrido antes (`{python} fp(s_ctx.loc["OUT_VEZES", "pct_nao_informado"])` ignorado ou vazio). Ao contrário da repetição por endereço da PMDF, essa medida refere-se à própria vítima.
+- **Álcool.** Houve suspeita de uso de álcool pelo autor em `{python} fp(s_ctx.loc["AUTOR_ALCO", "p"])` das respostas válidas, mas o campo é ignorado em `{python} fp(s_ctx.loc["AUTOR_ALCO", "pct_nao_informado"])` das notificações.
+- **Motivação.** Quando informada, a motivação é o sexismo em `{python} fp(s_motiv["pct_validas"]["Sexismo"])` dos casos.
+
+Após a notificação, `{python} fp(s_enc.loc["Rede de saúde", "p"])` das vítimas foram encaminhadas a outro serviço da rede de saúde. Os encaminhamentos para fora dela são menos frequentes: Conselho Tutelar (`{python} fp(s_enc.loc["Conselho Tutelar", "p"])`), Delegacia da Mulher (`{python} fp(s_enc.loc["Delegacia da Mulher", "p"])`), outras delegacias (`{python} fp(s_enc.loc["Outras delegacias", "p"])`) e atendimento especializado à mulher (`{python} fp(s_enc.loc["Atendimento especializado à mulher", "p"])`).
+
+## Associações
+
+Assim como o tamanho do histórico na PMDF, a idade é o principal fator de confusão no SINAN: a violência sexual concentra-se na infância e a física por parceiro na vida adulta. As razões de prevalência foram calculadas entre respostas válidas, brutas e ajustadas por faixa etária (Mantel-Haenszel).
+
+```{python}
+#| label: fig-sinan-associacoes
+#| fig-cap: "Razões de prevalência (IC 95%) brutas e ajustadas por faixa etária, SINAN."
+rf.forest(s_assoc, COLORS, f"Associações entre fatores e formas de violência ({ANO_SINAN})", nomes=("Bruta", "Ajustada por faixa etária"));
+```
+
+```{python}
+#| label: tbl-sinan-associacoes
+#| tbl-cap: "Razões de prevalência brutas e ajustadas por faixa etária, SINAN"
+#| output: asis
+t = pd.DataFrame({
+    "Associação": s_assoc["rotulo"],
+    "RP bruta (IC 95%)": [f"{fn(r.bruta_rp, 2)} ({fn(r.bruta_inf, 2)}–{fn(r.bruta_sup, 2)})" for r in s_assoc.itertuples()],
+    "RP ajustada (IC 95%)": [f"{fn(r.ajustada_rp, 2)} ({fn(r.ajustada_inf, 2)}–{fn(r.ajustada_sup, 2)})" for r in s_assoc.itertuples()],
+    "n": s_assoc["n_validos"].map(fn),
+})
+print(rs.tabela_markdown(t))
+```
+
+- **Álcool e violência física.** A associação bruta (RP = `{python} frp_sinan_bruta("Álcool → violência física")`) cai após o ajuste por idade (RP = `{python} frp_sinan("Álcool → violência física")`), valor próximo do 1,17 encontrado por Bandiera-Paiva et al. (2026) com o SINAN de São Paulo. A estimativa ajustada da PMDF, também próxima de 1, aponta na mesma direção. Com a violência psicológica/moral, a associação desaparece (RP ajustada = `{python} frp_sinan("Álcool → violência psicológica/moral")`).
+- **Vínculo íntimo.** Ser agredida por parceiro ou ex-parceiro associa-se à violência física (RP ajustada = `{python} frp_sinan("Vínculo íntimo → violência física")`) e, sobretudo, à violência de repetição (RP ajustada = `{python} frp_sinan("Vínculo íntimo → violência de repetição")`). É a associação mais forte da base, coerente com o caráter cíclico da violência por parceiro.
+- **Arma de fogo e violência psicológica/moral.** A estimativa (RP ajustada = `{python} frp_sinan("Arma de fogo → violência psicológica/moral")`) tem intervalo amplo, por haver poucos casos com arma de fogo, e não permite conclusão.
+
+Como na PMDF, as associações são transversais e não autorizam leitura causal.
+
+## Síntese do SINAN
+
+- **Perfil distinto da PMDF.** O SINAN reúne violência sexual contra meninas e violência física contra mulheres adultas. Só o recorte doméstico adulto (`{python} fp(len(s_dom) / NS_ano)` das notificações) é diretamente comparável aos atendimentos policiais.
+- **Padrão temporal convergente.** Fins de semana e noites concentram a violência nas duas fontes, o que reforça a leitura de que o tempo de convívio eleva o risco.
+- **Repetição associada ao vínculo íntimo.** Mais da metade das notificações informam violência anterior, e o vínculo íntimo praticamente dobra essa proporção após o ajuste por idade.
+- **Limites da fonte.** A notificação tardia, as datas imputadas e o alto percentual de ignorado em campos de contexto exigem cautela, sobretudo no ano mais recente.
 
 # Integração complementar: SINAN × PMDF {#sec-sinan}
 
@@ -611,7 +866,8 @@ A PMDF mede a repetição de endereço; o SINAN, o histórico de violência info
 3. **Lacuna de registro.** De 06/09 a 16/09/2024 não há registros no sistema. A causa precisa ser confirmada com a PMDF.
 4. **Georreferenciamento.** Cerca de metade das ocorrências não tem coordenada utilizável, com forte desigualdade entre RAs.
 5. **Ausência de população.** Sem denominadores populacionais por RA, comparações territoriais são de volume, não de risco.
-6. **Desfecho.** Não foi identificado em `{python} fp(desfecho.get("nao_identificado", 0))` das narrativas.
+6. **SINAN.** Notificação tardia (último ano subestimado), datas de ocorrência imputadas no dia 1, hora pouco preenchida e alto percentual de ignorado em campos como álcool e motivação.
+7. **Desfecho.** Não foi identificado em `{python} fp(desfecho.get("nao_identificado", 0))` das narrativas.
 
 # Conclusões e próximos passos
 
@@ -633,6 +889,8 @@ A PMDF mede a repetição de endereço; o SINAN, o histórico de violência info
 BANDIERA-PAIVA, P. et al. Uso de inteligência artificial para análise da violência contra mulheres em São Paulo. **Revista de Saúde Pública**, v. 60, e28, 2026.
 
 BRASIL. Lei nº 11.340, de 7 de agosto de 2006 (Lei Maria da Penha).
+
+BRASIL. Ministério da Saúde. **Viva**: instrutivo de notificação de violência interpessoal e autoprovocada. 2. ed. Brasília: Ministério da Saúde, 2016.
 
 FARRELL, G.; PEASE, K. **Once bitten, twice bitten**: repeat victimisation and its implications for crime prevention. London: Home Office, 1993.
 
