@@ -55,7 +55,7 @@ def serie_diaria(diario, lacunas, COLORS, titulo, janela=7):
     return fig
 
 
-def barras_media_diaria(tabela, COLORS, titulo, destaque=None):
+def barras_media_diaria(tabela, COLORS, titulo, destaque=None, ylabel="Ocorrências por dia (média)"):
     """Média diária por categoria do calendário, com a média geral como referência."""
     fig, ax = plt.subplots(figsize=(8, 3.6))
     destaque = set(destaque or [])
@@ -73,20 +73,20 @@ def barras_media_diaria(tabela, COLORS, titulo, destaque=None):
                     bbox=dict(boxstyle="square,pad=0.15", fc="white", ec="none"))
     ax.yaxis.grid(True)
     ax.set_axisbelow(True)
-    ax.set_ylabel("Ocorrências por dia (média)")
+    ax.set_ylabel(ylabel)
     ax.set_title(titulo)
     fig.tight_layout()
     return fig
 
 
-def heatmap_hora_dia(matriz, COLORS, titulo):
+def heatmap_hora_dia(matriz, COLORS, titulo, legenda="Ocorrências por dia"):
     """Média de ocorrências por dia em cada combinação de hora e dia da semana (escala sequencial)."""
     fig, ax = plt.subplots(figsize=(9, 3.4))
     im = ax.imshow(matriz.values, aspect="auto", cmap="Reds", interpolation="nearest", vmin=0)
     ax.set_yticks(range(len(matriz.index)), [d[:3] for d in matriz.index])
     ax.set_xticks(range(0, 24, 2), [f"{h}h" for h in range(0, 24, 2)])
     barra = fig.colorbar(im, ax=ax, fraction=0.025, pad=0.01)
-    barra.set_label("Ocorrências por dia", fontsize=8, color=COLORS["muted"])
+    barra.set_label(legenda, fontsize=8, color=COLORS["muted"])
     barra.outline.set_visible(False)
     barra.ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: _virgula(f"{v:g}")))
     for spine in ax.spines.values():
@@ -139,7 +139,8 @@ def forest(tabela, COLORS, titulo, series=("bruta", "ajustada"), nomes=("Bruta",
     return fig
 
 
-def curva_concentracao(contagens, COLORS, titulo):
+def curva_concentracao(contagens, COLORS, titulo, unidade="células", evento="ocorrências",
+                       xlabel="Células ocupadas (da mais à menos ativa)"):
     """Proporção acumulada de ocorrências pelas células ordenadas da mais à menos ativa."""
     ordenado = np.sort(np.asarray(contagens))[::-1]
     x = np.arange(1, len(ordenado) + 1) / len(ordenado)
@@ -149,12 +150,12 @@ def curva_concentracao(contagens, COLORS, titulo):
     ax.plot([0, 1], [0, 1], color=COLORS["neutral"], linewidth=1, label="Distribuição uniforme")
     i50 = int(np.searchsorted(y, 0.5))
     ax.scatter([x[i50]], [y[i50]], color=COLORS["primary"], s=30, zorder=3)
-    ax.annotate(_virgula(f"{x[i50] * 100:.1f}% das células\nconcentram 50% das ocorrências"), xy=(x[i50], y[i50]), xytext=(12, -24), textcoords="offset points", fontsize=8, color=COLORS["ink"])
+    ax.annotate(_virgula(f"{x[i50] * 100:.1f}% das {unidade}\nconcentram 50% das {evento}"), xy=(x[i50], y[i50]), xytext=(12, -24), textcoords="offset points", fontsize=8, color=COLORS["ink"])
     _eixo_pct(ax.xaxis)
     _eixo_pct(ax.yaxis)
     ax.grid(True)
-    ax.set_xlabel("Células ocupadas (da mais à menos ativa)")
-    ax.set_ylabel("Ocorrências acumuladas")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(f"{evento.capitalize()} acumuladas")
     ax.set_title(titulo)
     ax.legend(loc="lower right", fontsize=8)
     fig.tight_layout()
@@ -245,5 +246,21 @@ def linhas_comparadas(categorias, series, COLORS, titulo, ylabel, notas=None):
     ax.margins(y=0.15)
     ax.set_ylabel(ylabel)
     _titulo_com_legenda(ax, titulo, ncol=len(series))
+    fig.tight_layout()
+    return fig
+
+
+def barras_ordenadas(rotulos, valores, COLORS, titulo, ylabel=None):
+    """Proporções em barras verticais na ordem recebida (categorias ordinais, como faixas etárias)."""
+    fig, ax = plt.subplots(figsize=(8, 3.6))
+    ax.bar(rotulos, valores, color=COLORS["primary"], width=0.6)
+    for i, v in enumerate(valores):
+        ax.annotate(_rotulo_pct(v), xy=(i, v), xytext=(0, 3), textcoords="offset points", ha="center", fontsize=8, color=COLORS["muted"])
+    _eixo_pct(ax.yaxis)
+    ax.yaxis.grid(True)
+    ax.set_axisbelow(True)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+    ax.set_title(titulo)
     fig.tight_layout()
     return fig

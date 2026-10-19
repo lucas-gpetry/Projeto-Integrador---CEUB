@@ -12,6 +12,7 @@ data/*.csv
 outputs/reincidencia_validacao/
 outputs/agrupamentos_nlp/
 outputs/sinan_integracao/
+outputs/sinan_eda/
 
 # Mac OS
 .DS_Store
