@@ -75,6 +75,29 @@ class TestDicionarios(unittest.TestCase):
         self.assertTrue(classificar("A vítima possui medidas protetivas.")["flag_medida_protetiva"])
         self.assertTrue(classificar("Houve descumprimento das MPUs.")["flag_medida_protetiva"])
 
+    def test_objeto_sozinho_nao_e_violencia_patrimonial(self):
+        self.assertFalse(classificar("A vítima abriu o portão para a guarnição.")["v_patrimonial"])
+        self.assertFalse(classificar("A equipe bateu na porta e foi atendida.")["v_patrimonial"])
+        self.assertFalse(classificar("O autor fugiu de carro.")["v_patrimonial"])
+
+    def test_objeto_com_verbo_de_dano(self):
+        self.assertTrue(classificar("O autor chutou a porta da residência.")["v_patrimonial"])
+        self.assertTrue(classificar("O autor jogou o celular da vítima no chão.")["v_patrimonial"])
+        self.assertTrue(classificar("O autor quebrou o celular da vítima.")["v_patrimonial"])
+        self.assertFalse(classificar("O autor não chutou a porta.")["v_patrimonial"])
+
+    def test_tomar_so_com_bem_como_complemento(self):
+        self.assertTrue(classificar("O autor tomou o celular da vítima.")["v_patrimonial"])
+        self.assertTrue(classificar("O autor tomou-lhe o celular.")["v_patrimonial"])
+        self.assertFalse(classificar("A equipe tomou conhecimento dos fatos.")["v_patrimonial"])
+        self.assertFalse(classificar("Foram tomadas as providências cabíveis.")["v_patrimonial"])
+        self.assertFalse(classificar("O autor tomou rumo ignorado.")["v_patrimonial"])
+
+    def test_bater_sem_agressao(self):
+        self.assertFalse(classificar("A equipe bateu na porta da residência.")["v_fisica"])
+        self.assertFalse(classificar("O casal bateu boca na rua.")["v_fisica"])
+        self.assertTrue(classificar("O autor bateu na vítima.")["v_fisica"])
+
     def test_improcedencia_zera_violencias(self):
         resultado = classificar("Nada constatado. O autor teria agredido a vítima.")
         self.assertFalse(any(resultado[c] for c in ["v_fisica", "v_psicologica", "v_patrimonial", "v_sexual", "v_moral"]))

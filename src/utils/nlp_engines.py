@@ -28,9 +28,11 @@ LEMAS_VIOLENCIA = {
                              "espancar", "espancamento", "puxão"}),
     "v_psicologica": _sem_acento({"ameaçar", "ameaça", "humilhar", "humilhação", "xingar", "xingamento", "proibir",
                                   "isolar", "perseguir", "perseguição", "medo", "gritar", "importunar", "importunação"}),
+    # Objetos e "tomar" são candidatos: só contam com as condições de extrair_tipos_spacy.
     "v_patrimonial": _sem_acento({"quebrar", "rasgar", "subtrair", "destruir", "danificar", "arrombar", "incendiar", "queimar",
                                   "tomar", "furtar", "roubar", "extorquir", "estragar", "celular", "aparelho", "veículo", "carro",
-                                  "moto", "móveis", "televisão", "tv", "vidro", "portão", "janela", "porta", "dinheiro", "cartão", "carteira"}),
+                                  "moto", "móveis", "móvel", "televisão", "tv", "vidro", "portão", "janela", "porta", "dinheiro",
+                                  "cartão", "carteira"}),
     "v_sexual": _sem_acento({"estuprar", "estupro", "sexo", "libidinoso", "vulnerável", "toque"}),
     "v_moral": _sem_acento({
         "caluniar", "difamar", "injuriar", "honra", "fofoca", "reputação", "boato", "ofender", "ofensa", "xingar",
@@ -62,7 +64,22 @@ OBJETOS_SEPARAR_BRIGA = {"briga", "brigas", "confusao", "partes", "ambos", "amba
 # "separado" só como estado civil ("estavam separados"), não "ouvida em separado" / "quartos separados".
 VERBOS_ESTADO = {"esta", "estao", "estava", "estavam", "estar", "sao", "eram", "vivem", "viviam", "ficaram", "ja"}
 
-TERMOS_IMPROCEDENCIA = ["nada constatado", "nada foi constatado", "negativo quanto", "ausencia de indicios", "nao houve constatacao"]
+# Sozinho, o objeto não indica dano: "porta" e "portão" aparecem na rotina do atendimento ("abriu o
+# portão", "bateu na porta"). O objeto só conta com um verbo de dano a até JANELA_OBJETO palavras;
+# os verbos de dano do léxico ("quebrar", "arrombar"...) já contam por si.
+OBJETOS_PATRIMONIO = _sem_acento({"celular", "aparelho", "veículo", "carro", "moto", "móveis", "móvel", "televisão", "tv",
+                                  "vidro", "portão", "janela", "porta", "dinheiro", "cartão", "carteira"})
+VERBOS_DANO_OBJETO = _sem_acento({"chutar", "forçar", "derrubar", "socar", "esmurrar", "jogar", "arremessar", "riscar", "furar"})
+JANELA_OBJETO = 3
+# "tomar" só é subtração quando o complemento é um bem ("tomou o celular"). Exclui "tomar
+# conhecimento", "tomadas as providências", "tomou rumo ignorado", "tomar remédio".
+OBJETOS_TOMAR = _sem_acento({"celular", "aparelho", "telefone", "dinheiro", "cartão", "carteira", "chave", "documento",
+                             "bolsa", "veículo", "carro", "moto", "bem", "bens", "pertence", "pertences", "bicicleta"})
+ANTES_DO_OBJETO = {"a", "o", "as", "os", "um", "uma", "seu", "sua", "seus", "suas", "lhe", "me", "te", "dela", "dele"}
+# "Bater na porta", "bater palmas" e "bater boca" não são agressão física.
+BATER_NAO_FISICO = {"porta", "portao", "campainha", "palma", "palmas", "boca", "janela"}
+
+TERMOS_IMPROCEDENCIA =["nada constatado", "nada foi constatado", "negativo quanto", "ausencia de indicios", "nao houve constatacao"]
 
 # Negação (NegEx adaptado): o gatilho só nega o termo se entre eles houver apenas palavras
 # "transparentes" (artigos, clíticos, auxiliares e verbos de estado/posse). Assim "nao a agrediu"
@@ -187,9 +204,10 @@ def extrair_tipos_spacy(doc):
         return resultados
 
     palavras = _palavras(doc)
+    lemas = [_lema(token) for token in doc]
 
     for token in doc:
-        lema = _lema(token)
+        lema = lemas[token.i]
         for categoria, termos in LEMAS_VIOLENCIA.items():
             if lema in termos:
 
@@ -203,6 +221,10 @@ def extrair_tipos_spacy(doc):
                     if any(g in vizinhos_genero for g in ["feminino", "masculino", "fem", "masc"]):
                         continue
 
+                if categoria == "v_fisica" and lema == "bater":
+                    if BATER_NAO_FISICO.intersection(palavras[token.i + 1:token.i + 4]):
+                        continue
+
                 # Refinamento de Violência Patrimonial
                 if categoria == "v_patrimonial":
                     if lema == "quebrar":
@@ -211,12 +233,11 @@ def extrair_tipos_spacy(doc):
                         if any(v in termos_juridicos for v in vizinhos):
                             continue
 
-                    if lema in ["celular", "dinheiro", "cartao", "carteira", "aparelho", "veiculo"]:
-                        # Lista de verbos que indicam agressão ao patrimônio
-                        verbos_acao = ["quebrou", "quebrar", "danificou", "danificar", "tomou", "tomar",
-                                       "subtraiu", "subtrair", "roubou", "roubar", "rasgou", "rasgar"]
-                        if not any(v in texto_bruto for v in verbos_acao):
-                            continue
+                    if lema == "tomar" and not _complemento_e_bem(palavras, lemas, token.i):
+                        continue
+
+                    if lema in OBJETOS_PATRIMONIO and not _verbo_de_dano_proximo(palavras, lemas, token.i):
+                        continue
 
                 # 3. Tratamento Inteligente de Importunação
                 if lema in ["importunar", "importunacao"]:
@@ -227,15 +248,19 @@ def extrair_tipos_spacy(doc):
                         resultados["v_psicologica"] = True
                     continue
 
-                if categoria == "v_moral":
-                    if lema == "mentira":
-                        indicadores_crime = ["contou", "espalhou", "falou", "inventou"]
-                        negativas_autor = ["autor disse", "autor alegou", "ser mentira", "diz ser"]
-
-                        if any(n in texto_bruto for n in negativas_autor):
-                            continue
-                        if not any(i in texto_bruto for i in indicadores_crime):
-                            continue
-
                 resultados[categoria] = True
     return resultados
+
+
+def _complemento_e_bem(palavras, lemas, posicao):
+    """Indica se o complemento de "tomar" (pulando artigos, possessivos e clíticos) é um bem."""
+    j = posicao + 1
+    while j < len(palavras) and palavras[j] in ANTES_DO_OBJETO:
+        j += 1
+    return j < len(palavras) and (palavras[j] in OBJETOS_TOMAR or lemas[j] in OBJETOS_TOMAR)
+
+
+def _verbo_de_dano_proximo(palavras, lemas, posicao):
+    """Indica se há verbo de dano não negado a até JANELA_OBJETO palavras do objeto."""
+    inicio, fim = max(posicao - JANELA_OBJETO, 0), min(posicao + JANELA_OBJETO + 1, len(lemas))
+    return any(lemas[k] in VERBOS_DANO_OBJETO and not termo_negado(palavras, k) for k in range(inicio, fim) if k != posicao)
