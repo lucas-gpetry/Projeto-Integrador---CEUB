@@ -6,6 +6,8 @@ env/
 # Dados (Segurança PMDF)
 data/*.xlsx
 data/*.csv
+# A grade lista todas as células ocupadas, inclusive as que os mapas suprimem (< 5 ocorrências).
+data/*.geojson
 !data/.gitkeep
 
 # Exportações locais de validação (contêm dados sensíveis)
