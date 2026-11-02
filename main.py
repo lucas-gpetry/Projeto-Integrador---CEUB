@@ -1,9 +1,8 @@
 import time
 import os
 import sys
-import pandas as pd
 from src.clean_data import processar_base_completa
-from src.geo_analysis import processar_geoespacial # <-- Sua importação aqui
+from src.geo_analysis import processar_geoespacial
 from src.analysis import realizar_analise
 from scripts.agrupamentos_nlp import gerar_agrupamentos_nlp
 from src.sinan_pipeline import processar_sinan_e_integrar_pmdf
@@ -15,35 +14,14 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-def contar_enderecos_repetidos():
-    caminho = os.path.join(os.path.dirname(__file__), "data", "base_espacial.csv")
-    df = pd.read_csv(caminho)
-
-    colunas = ["bairro", "quadra", "complemento"]
-    total = len(df)
-
-    duplicados = df.duplicated(subset=colunas, keep=False)
-    qtd_repetidas = duplicados.sum()
-    percentual = (qtd_repetidas / total) * 100
-
-    print(f"\nTotal de linhas: {total}")
-    print(f"Linhas com endereço repetido (bairro+quadra+complemento): {qtd_repetidas}")
-    print(f"Percentual do total: {percentual:.2f}%")
-
-    contagem = df.groupby(colunas).size().reset_index(name="ocorrencias")
-    repetidos = contagem[contagem["ocorrencias"] > 1].sort_values("ocorrencias", ascending=False)
-
-    total_enderecos_unicos = len(contagem)
-    percentual_repetidos = (len(repetidos) / total_enderecos_unicos) * 100
-    print(f"\nEndereços únicos que se repetem: {len(repetidos)} de {total_enderecos_unicos} ({percentual_repetidos:.2f}%)")
-    print("\nTop 10 endereços mais repetidos:")
-    print(repetidos.head(10).to_string(index=False))
-
 def run():
     print("="*50)
     print("PROJETO PMDF - ANÁLISE MARIA DA PENHA")
     print("="*50)
-    
+
+    # As etapas 1 a 4 resolvem caminhos a partir do diretório atual; a 5, a partir da raiz.
+    # Fixar a raiz evita que uma etapa leia a saída antiga de outra.
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
     inicio_total = time.time()
 
     try:
@@ -90,6 +68,9 @@ def run():
     except Exception as e:
         print(f"\nERRO NO PIPELINE: {e}")
         import traceback; print(traceback.format_exc())
+        # Código de saída diferente de zero: uma etapa que falha deixa as saídas da execução
+        # anterior no lugar, e o relatório as renderizaria sem aviso.
+        sys.exit(1)
 
 if __name__ == "__main__":
     run()
