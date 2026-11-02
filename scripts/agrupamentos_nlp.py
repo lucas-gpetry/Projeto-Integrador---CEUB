@@ -82,8 +82,11 @@ def normalize_address(df: pd.DataFrame) -> pd.Series:
             parts.append(df[column].fillna("").astype("string").str.upper())
         else:
             parts.append(pd.Series("", index=df.index, dtype="string"))
-    address = parts[0] + " " + parts[1] + " " + parts[2]
-    return address.str.replace(r"\s+", " ", regex=True).str.strip()
+    parts = [part.str.replace(r"\s+", " ", regex=True).str.strip() for part in parts]
+    address = parts[0] + " | " + parts[1] + " | " + parts[2]
+    # Mesma regra de src/geo_analysis.chave_endereco: sem quadra nem complemento, o endereço não
+    # é identificável e não deve juntar todas as ocorrências da RA numa só chave.
+    return address.mask((parts[1] == "") & (parts[2] == ""))
 
 
 def safe_filename(value: str) -> str:
@@ -127,13 +130,14 @@ def build_summary(df: pd.DataFrame) -> pd.DataFrame:
 
 def build_address_category(df: pd.DataFrame, category_columns: list[str]) -> pd.DataFrame:
     rows = []
-    date = pd.to_datetime(df["data hora"], errors="coerce", dayfirst=True) if "data hora" in df else pd.Series(pd.NaT, index=df.index)
+    # "data hora" chega em ISO 8601; dayfirst=True trocaria dia e mês.
+    date = pd.to_datetime(df["data hora"], errors="coerce") if "data hora" in df else pd.Series(pd.NaT, index=df.index)
     for column in category_columns:
         selected = df[df[column]].copy()
         if selected.empty:
             continue
         selected["_data"] = date.loc[selected.index]
-        grouped = selected.groupby(["endereco_chave", "TIPO_MORADIA"], dropna=False)
+        grouped = selected.groupby(["endereco_chave", "TIPO_MORADIA"], dropna=True)
         for (address, housing), group in grouped:
             dates = group["_data"].dropna()
             rows.append({

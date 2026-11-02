@@ -36,6 +36,32 @@ def rotulo_contagem(n, k=K_MINIMO_RA):
     return f"{n} casos" if n >= k else f"menos de {k} casos"
 
 
+def chave_endereco(cidade, quadra, complemento):
+    """Chave textual do endereço (RA | quadra | complemento), em caixa alta e com espaços normalizados.
+
+    Sem quadra nem complemento o endereço não é identificável: a chave fica ausente, em vez de
+    juntar todas as ocorrências da RA sem endereço como se fossem um mesmo local.
+    """
+    partes = [s.fillna('').astype(str).str.upper().str.replace(r'\s+', ' ', regex=True).str.strip()
+              for s in (cidade, quadra, complemento)]
+    chave = partes[0] + ' | ' + partes[1] + ' | ' + partes[2]
+    return chave.mask((partes[1] == '') & (partes[2] == ''))
+
+
+def repeticao_por_endereco(chave):
+    """Número de ocorrências com a mesma chave; ausente quando o endereço não é identificável."""
+    return chave.map(chave.value_counts()).astype('Int64')
+
+
+def grade_regular(xmin, ymin, xmax, ymax, tamanho):
+    """Polígonos da grade que cobre o retângulo inteiro, incluindo pontos sobre xmax e ymax."""
+    cols = np.arange(xmin, xmax + tamanho, tamanho)
+    rows = np.arange(ymin, ymax + tamanho, tamanho)
+    cols, rows = cols[cols <= xmax], rows[rows <= ymax]
+    return [Polygon([(x, y), (x + tamanho, y), (x + tamanho, y + tamanho), (x, y + tamanho)])
+            for x in cols for y in rows]
+
+
 def classificar_tipo_local(quadra, complemento):
     """Classifica o tipo de local pelo endereço; a ordem de PADROES_TIPO_LOCAL é a precedência."""
     endereco = quadra.fillna('').str.upper() + " " + complemento.fillna('').str.upper()
@@ -63,10 +89,6 @@ def processar_geoespacial():
 
     # --- 1. ENGENHARIA DE FEATURES ---
     print("Criando variáveis de Turno e Tipo de Moradia...")
-    df['COMPLEMENTO_CLEAN'] = df['complemento'].fillna('').str.upper()
-    df['QUADRA_CLEAN'] = df['quadra'].fillna('').str.upper()
-    df['ENDERECO_BUSCA'] = df['cidade'].fillna('').str.upper() + " " + df['QUADRA_CLEAN'] + " " + df['COMPLEMENTO_CLEAN']
-
     df['TIPO_MORADIA'] = classificar_tipo_local(df['quadra'], df['complemento'])
 
     bins = [-1, 5, 11, 17, 23]
@@ -74,10 +96,8 @@ def processar_geoespacial():
     df['TURNO'] = pd.cut(df['hora'], bins=bins, labels=labels)
 
     # --- 2. ANÁLISE DE REINCIDÊNCIA ---
-    print("Analisando reincidência por endereço...")
-    contagem_enderecos = df['ENDERECO_BUSCA'].value_counts()
-    df['reincidencia_endereco'] = df['ENDERECO_BUSCA'].map(contagem_enderecos)
-    df.drop(columns=['COMPLEMENTO_CLEAN', 'QUADRA_CLEAN', 'ENDERECO_BUSCA'], inplace=True)
+    print("Analisando repetição de chamados por endereço...")
+    df['reincidencia_endereco'] = repeticao_por_endereco(chave_endereco(df['cidade'], df['quadra'], df['complemento']))
 
     # --- 3. GRADE ESPACIAL E SJOIN ---
     print("Realizando clusterização espacial (Grade 500m)...")
@@ -94,9 +114,7 @@ def processar_geoespacial():
         xmin, ymin, xmax, ymax = gdf_utm.total_bounds
         tamanho_celula = 500 
 
-        cols = list(np.arange(xmin, xmax, tamanho_celula))
-        rows = list(np.arange(ymin, ymax, tamanho_celula))
-        poligonos = [Polygon([(x, y), (x + tamanho_celula, y), (x + tamanho_celula, y + tamanho_celula), (x, y + tamanho_celula)]) for x in cols[:-1] for y in rows[:-1]]
+        poligonos = grade_regular(xmin, ymin, xmax, ymax, tamanho_celula)
 
         grid = gpd.GeoDataFrame({'id_celula': range(len(poligonos))}, geometry=poligonos, crs="EPSG:31983")
         intersecao = gpd.sjoin(gdf_utm, grid, how='inner', predicate='intersects')

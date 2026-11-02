@@ -7,11 +7,16 @@ import unittest
 
 import pandas as pd
 
+import geopandas as gpd
+
 from src.geo_analysis import (
     K_MINIMO_CELULA,
     celulas_publicaveis,
+    chave_endereco,
     classificar_tipo_local,
     feminicidios_por_ra,
+    grade_regular,
+    repeticao_por_endereco,
     rotulo_contagem,
 )
 
@@ -43,6 +48,34 @@ class TestTipoLocal(unittest.TestCase):
     def test_nulos(self):
         resultado = classificar_tipo_local(pd.Series([None]), pd.Series([None])).iloc[0]
         self.assertEqual(resultado, "OUTROS / NÃO IDENTIFICADO")
+
+
+class TestChaveEndereco(unittest.TestCase):
+    def chaves(self, linhas):
+        cidade, quadra, complemento = (pd.Series(c) for c in zip(*linhas))
+        return chave_endereco(cidade, quadra, complemento)
+
+    def test_endereco_sem_quadra_nem_complemento_fica_sem_chave(self):
+        chave = self.chaves([("CEILANDIA", None, None), ("CEILANDIA", "", "  ")])
+        self.assertTrue(chave.isna().all())
+        self.assertTrue(repeticao_por_endereco(chave).isna().all())
+
+    def test_espacos_e_caixa_normalizados(self):
+        chave = self.chaves([("Gama", "QD  10", "casa 5 "), ("GAMA", "QD 10", "CASA 5")])
+        self.assertEqual(chave.iloc[0], chave.iloc[1])
+        self.assertEqual(repeticao_por_endereco(chave).tolist(), [2, 2])
+
+    def test_separador_impede_colisao_entre_campos(self):
+        chave = self.chaves([("GAMA", "QD 10 CASA", "5"), ("GAMA", "QD 10", "CASA 5")])
+        self.assertNotEqual(chave.iloc[0], chave.iloc[1])
+
+
+class TestGrade(unittest.TestCase):
+    def test_pontos_no_limite_superior_ficam_cobertos(self):
+        pontos = gpd.GeoSeries(gpd.points_from_xy([0, 1000, 1000, 437], [0, 1000, 0, 999]))
+        grade = gpd.GeoSeries(grade_regular(0, 0, 1000, 1000, 500))
+        cobertos = [grade.intersects(p).any() for p in pontos]
+        self.assertTrue(all(cobertos))
 
 
 class TestSupressaoMapas(unittest.TestCase):
