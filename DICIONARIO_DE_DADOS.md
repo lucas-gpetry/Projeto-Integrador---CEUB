@@ -35,9 +35,10 @@ Variáveis criadas pela Frente de Análise Espacial para padronizar o "Onde" oco
 | Coluna | Tipo | Descrição |
 | :--- | :--- | :--- |
 | `TIPO_MORADIA` | Categórico | Tipo de local inferido por Regex sobre quadra e complemento (palavras inteiras; o nome da cidade fica fora da busca). Valores: `CASA`, `APARTAMENTO`, `VIA PUBLICA`, `COMERCIO / SERVICO` ou `OUTROS / NÃO IDENTIFICADO`. "CONJUNTO" não conta como casa: é unidade de endereçamento no DF. Regras em `PADROES_TIPO_LOCAL` (`src/geo_analysis.py`). |
-| `id_celula` | Inteiro | **(Variável Chave Preditiva)** ID numérico do quadrante de 500x500 metros onde o crime ocorreu. *Nota: Cerca de 5.600 linhas possuem este campo nulo (NaN) propositalmente devido a ruídos no GPS original. O modelo preditivo espacial deve treinar apenas com linhas não-nulas.* |
+| `reincidencia_endereco` | Inteiro | Número de ocorrências de 2024 com o mesmo endereço textual (chave RA \| quadra \| complemento, em caixa alta e com espaços normalizados; `chave_endereco` em `src/geo_analysis.py`). Mede repetição de chamados no local, não reincidência de pessoa. Nulo quando não há quadra nem complemento (endereço não identificável). |
+| `id_celula` | Inteiro | **(Variável Chave Preditiva)** ID numérico do quadrante de 500x500 metros onde o crime ocorreu. A grade parte do canto inferior esquerdo das coordenadas válidas, então os IDs só valem dentro de uma mesma execução. *Nota: cerca de 5.700 linhas possuem este campo nulo (NaN) propositalmente: sem coordenada, coordenada zero ou coordenada padrão repetida do sistema. O modelo preditivo espacial deve treinar apenas com linhas não-nulas.* |
 
-## 5. Features Comportamentais e Contextuais (I.A. / NLP)
+## 5. Features Comportamentais e Contextuais (NLP)
 *Flags* geradas pelo processamento de Linguagem Natural (Regex sobre o `historico_limpo` e spaCy sobre o `historico` com acentos). Identificam a dinâmica da violência e agravantes de risco. Menções negadas ("não agrediu", "não possui medida protetiva") não ativam a flag. Uma flag `False` significa "não identificado pelas regras", não "ausente no fato".
 
 ### 5.1 Tipos de Violência Mapeados
@@ -45,9 +46,9 @@ Variáveis criadas pela Frente de Análise Espacial para padronizar o "Onde" oco
 | :--- | :--- | :--- |
 | `v_fisica` | Booleano | `True` se houve contato físico violento (socos, chutes, tapas, empurrões, espancamento). |
 | `v_psicologica` | Booleano | `True` se houve ameaça verbal, humilhação, xingamento grave ou perseguição. |
-| `v_patrimonial` | Booleano | `True` se o agressor quebrou, rasgou, subtraiu ou destruiu bens da vítima (celular, móveis, carro). |
+| `v_patrimonial` | Booleano | `True` se o agressor quebrou, rasgou, subtraiu ou destruiu bens da vítima (celular, móveis, carro). Um objeto citado sozinho não basta: precisa de verbo de dano a até três palavras ("chutou a porta", "jogou o celular"), e "tomar" só conta com um bem como complemento ("tomou o celular", e não "tomou conhecimento"). |
 | `v_sexual` | Booleano | `True` se houve menção a violência sexual, estupro ou atos libidinosos forçados. |
-| `v_moral` | Booleano | `True` se houve calúnia, difamação ou injúria contra a honra da vítima. |
+| `v_moral` | Booleano | `True` se houve calúnia, difamação ou injúria contra a honra da vítima. "Xingar" e "xingamento" contam também como psicológica (a Lei 11.340/2006 lista o insulto no art. 7º, II, e a injúria no art. 7º, V); por isso a coocorrência entre moral e psicológica é em grande parte mecânica. |
 
 ### 5.2 Agravantes e Fatores de Risco
 | Coluna | Tipo | Descrição |
@@ -65,5 +66,5 @@ Variáveis criadas pela Frente de Análise Espacial para padronizar o "Onde" oco
 | :--- | :--- | :--- |
 | `desfecho` | Categórico | Ação tomada pela PMDF, inferida do texto. Valores: `encaminhado_dp` (condução, prisão ou menção a DP/delegacia/DEAM; tem prioridade), `resolvido_local` (orientação, advertência ou acordo) ou `nao_identificado` (nenhum dos termos). |
 ### 5.3 Dados ausentes
-A coluna G, quadra tem 23% de dados ausentes, e a coluna H, complemento 8,13% de dados ausentes. 
+A coluna G, quadra, tem 26,3% de dados ausentes, e a coluna H, complemento, 8,1%. Em 364 ocorrências faltam os dois, e o endereço não é identificável. 
 

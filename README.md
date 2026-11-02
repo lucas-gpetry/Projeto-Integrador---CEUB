@@ -39,7 +39,7 @@ flowchart LR
     S2 --> R
     SINAN --> R
 
-    D1 -. validação .-> V[audit.py<br/>audit_reincidencia.py]
+    D1 -. validação .-> V[audit.py<br/>scripts/validate_reincidencia.ps1]
 ```
 
 ### Contratos de entrada e saída
@@ -56,10 +56,11 @@ flowchart LR
 
 - Os dados brutos e artefatos CSV ficam em `data/`, que não deve ser versionada por conter
   informações sensíveis e por seu tamanho.
-- `src/utils/anonimizacao.py` contém a rotina de substituição de nomes, CPFs, telefones e
-  matrículas por *placeholders*. Na implementação atual, ela ainda não é chamada pelo
-  `main.py`; deve ser executada antes de qualquer compartilhamento ou exportação da base.
-- `audit.py` e `audit_reincidencia.py` fazem validações independentes após a geração da base
+- `src/utils/anonimizacao.py` contém uma rotina experimental de substituição de nomes, CPFs,
+  telefones e matrículas por *placeholders*. Ela não é chamada pelo `main.py` e ainda deixa
+  passar telefones sem DDD, RG e nomes fora do dicionário (WP3 do plano de validação): não a
+  trate como salvaguarda. Nenhum trecho de narrativa deve ser compartilhado ou exportado.
+- `audit.py` e `scripts/validate_reincidencia.ps1` fazem validações independentes após a geração da base
   final, permitindo conferir contagens, flags e reincidência sem alterar os dados.
 - `outputs/agrupamentos_nlp/` é uma saída local ignorada pelo Git, pois os arquivos de
   conferência reproduzem históricos e demais campos potencialmente sensíveis.
@@ -140,7 +141,7 @@ A concentração por unidade notificadora é calculada quando a exportação tra
 ### `src/` (Motores Principais)
 * `clean_data.py`: Responsável por ler o Excel bruto, extrair variáveis de tempo (ano, mês, dia) e realizar a normalização básica do texto dos históricos (remoção de acentos e conversão para minúsculas). Gera a `base_limpa.csv`.
 * `geo_analysis.py`: O **Motor Espacial**. Cria variáveis de contexto (`TURNO`, `TIPO_MORADIA`) com base em Regex. Isola coordenadas válidas, corrige erros de formatação (vírgulas/pontos) e realiza um cruzamento espacial (*Spatial Join*) com uma grade poligonal de 500x500m do DF. Retorna o `id_celula` para a base preservando todas as linhas originais (evitando perda de dados sem GPS). Gera a `base_espacial.csv` e o mapa interativo.
-* `analysis.py`: O **Motor NLP**. Consome a base espacial e aplica a inteligência artificial (spaCy + Regex) em processamento de lote (`nlp.pipe`). Extrai flags cruciais como `v_fisica`, `flag_arma_fogo` e `flag_alcool`. Gera a `base_analisada.csv` final.
+* `analysis.py`: O **Motor NLP**. Consome a base espacial e aplica as regras de classificação (spaCy + Regex) em processamento de lote (`nlp.pipe`). Extrai flags cruciais como `v_fisica`, `flag_arma_fogo` e `flag_alcool`. Gera a `base_analisada.csv` final.
 * `sinan_pipeline.py`: Mantém o CSV SINAN bruto intacto, acrescenta campos analíticos e produz coortes de violência interpessoal para comparação mensal agregada com PMDF. Também gera perfil de qualidade, definições, séries anuais/mensais, coocorrências, sazonalidade, reincidência conceitual e correlações Pearson/Spearman, inclusive com defasagens e ajuste para múltiplos testes.
 * `sinan_eda.py`: Análise exploratória do SINAN no mesmo formato da análise PMDF: qualidade e completude da ficha, série 2010–2025, mês/dia da semana/hora/feriados, perfil da vítima, formas e meios de violência, vínculo e perfil do autor, local, encaminhamentos, razões de prevalência brutas e ajustadas por faixa etária e concentração por unidade notificadora. Executar com `python src/sinan_eda.py [--ano 2024] [--coorte coorte_pmdf_sensibilidade]`; gera tabelas, figuras e `resumo_eda_sinan.md` em `outputs/sinan_eda/`.
 * `audit.py`: Script avulso de validação (*Ground Truthing*). Imprime um relatório no terminal com estatísticas vitais e amostras de texto classificado para garantir a integridade da pipeline.
@@ -150,7 +151,7 @@ A concentração por unidade notificadora é calculada quando a exportação tra
 
 ### `src/utils/` (Ferramentas de Apoio)
 Contém funções auxiliares importadas pelos motores principais:
-* `anonimizador.py` *(ou o nome que vocês deram)*: Script crítico de segurança de dados (LGPD). Substitui nomes de vítimas, suspeitos, CPFs e matrículas por *placeholders* (`[NOME]`, `[CPF]`).
+* `src/utils/anonimizacao.py`: Script crítico de segurança de dados (LGPD). Substitui nomes de vítimas, suspeitos, CPFs e matrículas por *placeholders* (`[NOME]`, `[CPF]`).
 * `extracao_datetime.py`: Módulo modular para desmembrar a coluna 'data hora' em componentes úteis para análise de séries temporais.
 * `nlp_engines.py`: Contém a lógica pesada do spaCy (lematização e análise de dependência sintática) para identificar menções a agressões e desambiguar falsos positivos (ex: "não houve agressão física").
 * `read_file.py`: Função segura para ignorar cabeçalhos/rodapés falsos durante a leitura do Excel original.
