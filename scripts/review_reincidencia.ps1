@@ -13,7 +13,10 @@ function T([object]$Value) {
 }
 
 function CanonicalKey([object]$Row) {
-    return (((T $Row.cidade) + " " + (T $Row.quadra) + " " + (T $Row.complemento)) -replace "\s+", " ").Trim()
+    # Mesma regra de src/geo_analysis.chave_endereco (RA | quadra | complemento, espaços normalizados).
+    $parts = @(@($Row.cidade, $Row.quadra, $Row.complemento) | ForEach-Object { ((T $_) -replace "\s+", " ").Trim() })
+    if ($parts[1] -eq "" -and $parts[2] -eq "") { return "" }
+    return ($parts -join " | ")
 }
 
 function ParseDate([object]$Value) {

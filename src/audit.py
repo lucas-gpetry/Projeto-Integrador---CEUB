@@ -28,7 +28,7 @@ def auditar_pipeline():
     print("-" * 50)
 
     # 3. Validação da Frente NLP (Pessoa 3)
-    print("🧠 Detecções da Inteligência Artificial (NLP):")
+    print("🧠 Detecções do NLP:")
     colunas_nlp = ['v_fisica', 'v_psicologica', 'flag_arma_fogo', 'flag_alcool', 'flag_separacao']
     
     for col in colunas_nlp:

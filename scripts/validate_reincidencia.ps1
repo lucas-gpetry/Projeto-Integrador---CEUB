@@ -23,23 +23,27 @@ function Normalize-Label([object]$Value) {
 }
 
 function Get-AddressKey([object]$Row) {
-    return ((Get-Text $Row.cidade) + " " + (Get-Text $Row.quadra) + " " + (Get-Text $Row.complemento))
+    # Chave oficial, reimplementada de forma independente a partir de src/geo_analysis.chave_endereco:
+    # RA | quadra | complemento, com espaços normalizados; vazia sem quadra nem complemento.
+    $parts = @(@($Row.cidade, $Row.quadra, $Row.complemento) | ForEach-Object { ((Get-Text $_) -replace "\s+", " ").Trim() })
+    if ($parts[1] -eq "" -and $parts[2] -eq "") { return "" }
+    return ($parts -join " | ")
 }
 
 function Get-CanonicalAddressKey([object]$Row) {
-    $key = Get-AddressKey $Row
-    return (($key -replace "\s+", " ").Trim())
+    # Chave mais frouxa, só para medir fragmentação: sem acentos e sem pontuação.
+    $key = Normalize-Label (Get-AddressKey $Row)
+    return ((($key -replace "[^A-Z0-9| ]", " ") -replace "\s+", " ").Trim())
 }
 
-function Get-ResidentialType([string]$Key) {
-    $isApt = $Key -match "APTO|APARTAMENTO|APT|BLOCO|EDIF|ED\.|ANDAR|KITNET|RESIDENCIAL"
-    $isCasa = $Key -match "CASA|LOTE|CHACARA|FAZENDA|CONJUNTO"
-
-    if ($isCasa) { $type = "CASA" } else { $type = "OUTROS / NAO IDENTIFICADO" }
-    if ($isApt) { $type = "APARTAMENTO" }
-    if ($Key -match "RUA|AVENIDA|ESTACIONAMENTO|PARQUE|PRACA|VIA|BR|DF-|PASSARELA" -and $type -eq "OUTROS / NAO IDENTIFICADO") { $type = "VIA PUBLICA" }
-    if ($Key -match "BAR|LOJA|MERCADO|FARMACIA|SHOPPING|POSTO|DISTRIBUIDORA|RESTAURANTE|COMERCIO" -and $type -eq "OUTROS / NAO IDENTIFICADO") { $type = "COMERCIO / SERVICO" }
-    return $type
+function Get-ResidentialType([object]$Row) {
+    # Mesmas regex e precedência de PADROES_TIPO_LOCAL em src/geo_analysis.py; a RA fica fora.
+    $address = (Get-Text $Row.quadra) + " " + (Get-Text $Row.complemento)
+    if ($address -cmatch "\b(?:APTO|APARTAMENTO|APT|BLOCO|EDIF\w*|ED|ANDAR|KITNET|RESIDENCIAL)\b") { return "APARTAMENTO" }
+    if ($address -cmatch "\b(?:CASA|LOTE|CHACARA|FAZENDA)\b") { return "CASA" }
+    if ($address -cmatch "\b(?:RUA|AVENIDA|ESTACIONAMENTO|PARQUE|PRACA|VIA|BR|PASSARELA)\b|\bDF-") { return "VIA PUBLICA" }
+    if ($address -cmatch "\b(?:BAR|LOJA|MERCADO|FARMACIA|SHOPPING|POSTO|DISTRIBUIDORA|RESTAURANTE|COMERCIO)\b") { return "COMERCIO / SERVICO" }
+    return "OUTROS / NAO IDENTIFICADO"
 }
 
 function Get-Number([object]$Value) {
@@ -92,7 +96,7 @@ $prepared = foreach ($row in $rows) {
         Quadra = [string]$row.quadra
         Complemento = [string]$row.complemento
         TipoMoradia = [string]$row.TIPO_MORADIA
-        TipoEsperado = Get-ResidentialType $exactKey
+        TipoEsperado = Get-ResidentialType $row
         Latitude = $lat
         Longitude = $lon
         Hora = $hour
@@ -111,12 +115,11 @@ function Get-GroupCount([object[]]$Items, [string]$Property) {
     return $result
 }
 
-$exactCounts = Get-GroupCount $prepared "ExactKey"
-$canonicalCounts = Get-GroupCount $prepared "CanonicalKey"
-$residential = @($prepared | Where-Object { $_.TipoMoradia -in @("CASA", "APARTAMENTO") })
-$residentialCounts = Get-GroupCount $residential "ExactKey"
-$regexResidential = @($prepared | Where-Object { $_.TipoEsperado -in @("CASA", "APARTAMENTO") })
-$regexResidentialCounts = Get-GroupCount $regexResidential "ExactKey"
+# Endereços não identificáveis (chave vazia) ficam fora de toda contagem de repetição.
+$identified = @($prepared | Where-Object { $_.ExactKey -ne "" })
+$exactCounts = Get-GroupCount $identified "ExactKey"
+$canonicalCounts = Get-GroupCount $identified "CanonicalKey"
+$residential = @($identified | Where-Object { $_.TipoMoradia -in @("CASA", "APARTAMENTO") })
 $coordinateGroups = @($prepared | Where-Object { $null -ne $_.Latitude -and $null -ne $_.Longitude } | Group-Object { "{0}|{1}" -f $_.Latitude, $_.Longitude } | Sort-Object Count -Descending)
 $dominantCoordinateKey = if ($coordinateGroups.Count -gt 0) { $coordinateGroups[0].Name } else { "" }
 $dominantCoordinateCount = if ($coordinateGroups.Count -gt 0) { $coordinateGroups[0].Count } else { 0 }
@@ -167,19 +170,19 @@ $spatialChecks = foreach ($item in $prepared) {
 }
 
 $mismatchedStored = @($prepared | Where-Object {
-    $expected = $exactCounts[$_.ExactKey]
-    $null -eq $_.StoredRecurrence -or [int][math]::Round($_.StoredRecurrence) -ne $expected
+    if ($_.ExactKey -eq "") { $null -ne $_.StoredRecurrence }
+    else { $null -eq $_.StoredRecurrence -or [int][math]::Round($_.StoredRecurrence) -ne $exactCounts[$_.ExactKey] }
 })
 
-$sameTimestampGroups = @($prepared | Group-Object { "$($_.ExactKey)|$($_.DataHora)" } | Where-Object { $_.Count -gt 1 })
+$sameTimestampGroups = @($identified | Group-Object { "$($_.ExactKey)|$($_.DataHora)" } | Where-Object { $_.Count -gt 1 })
 
-$canonicalFragmentation = @($prepared | Where-Object {
+$canonicalFragmentation = @($identified | Where-Object {
     $exactCounts[$_.ExactKey] -ne $canonicalCounts[$_.CanonicalKey]
 })
 
 $typeMismatches = @($prepared | Where-Object { (Normalize-Label $_.TipoMoradia) -ne (Normalize-Label $_.TipoEsperado) })
 $duplicateNumbers = @($prepared | Group-Object Numero | Where-Object { $_.Count -gt 1 })
-$blankKeys = @($prepared | Where-Object { [string]::IsNullOrWhiteSpace($_.CanonicalKey) -or $_.CanonicalKey -match "^(\s+)?(\s+)?$" })
+$blankKeys = @($prepared | Where-Object { $_.ExactKey -eq "" })
 $lowInfoKeys = @($prepared | Where-Object {
     [string]::IsNullOrWhiteSpace(([string]$_.Cidade).Trim()) -or
     [string]::IsNullOrWhiteSpace(([string]$_.Quadra).Trim()) -or
@@ -303,11 +306,11 @@ $sameTimestampGroups | ForEach-Object {
 $metricRows = @(
     [pscustomobject]@{ Metrica = "total_registros"; Valor = $prepared.Count; Status = "info"; Observacao = "Linhas lidas de base_analisada.csv" }
     [pscustomobject]@{ Metrica = "numeros_duplicados"; Valor = $duplicateNumbers.Count; Status = if ($duplicateNumbers.Count -eq 0) { "ok" } else { "alerta" }; Observacao = "A chave numero deveria ser única" }
-    [pscustomobject]@{ Metrica = "chaves_endereco_vazias"; Valor = $blankKeys.Count; Status = if ($blankKeys.Count -eq 0) { "ok" } else { "alerta" }; Observacao = "Não devem formar grupos de reincidência" }
+    [pscustomobject]@{ Metrica = "chaves_endereco_vazias"; Valor = $blankKeys.Count; Status = "info"; Observacao = "Sem quadra nem complemento: endereço não identificável, fora da repetição" }
     [pscustomobject]@{ Metrica = "enderecos_com_componentes_ausentes"; Valor = $lowInfoKeys.Count; Status = if ($lowInfoKeys.Count -eq 0) { "ok" } else { "revisar" }; Observacao = "Cidade, quadra ou complemento ausente" }
-    [pscustomobject]@{ Metrica = "recorrencia_endereco_armazenda_divergente"; Valor = $mismatchedStored.Count; Status = if ($mismatchedStored.Count -eq 0) { "ok" } else { "falha" }; Observacao = "Comparação com contagem exata cidade+quadra+complemento" }
+    [pscustomobject]@{ Metrica = "recorrencia_endereco_armazenda_divergente"; Valor = $mismatchedStored.Count; Status = if ($mismatchedStored.Count -eq 0) { "ok" } else { "falha" }; Observacao = "Comparação com a recontagem pela chave oficial (vazia deve ficar ausente)" }
     [pscustomobject]@{ Metrica = "grupos_mesmo_endereco_datahora"; Valor = $sameTimestampGroups.Count; Status = if ($sameTimestampGroups.Count -eq 0) { "ok" } else { "revisar" }; Observacao = "Possíveis duplicidades ou múltiplos registros do mesmo evento" }
-    [pscustomobject]@{ Metrica = "fragmentacao_por_espacos"; Valor = $canonicalFragmentation.Count; Status = if ($canonicalFragmentation.Count -eq 0) { "ok" } else { "revisar" }; Observacao = "Diferença entre chave exata e chave com espaços normalizados" }
+    [pscustomobject]@{ Metrica = "fragmentacao_acentos_pontuacao"; Valor = $canonicalFragmentation.Count; Status = if ($canonicalFragmentation.Count -eq 0) { "ok" } else { "revisar" }; Observacao = "Ocorrências cuja contagem muda numa chave sem acentos nem pontuação" }
     [pscustomobject]@{ Metrica = "tipo_moradia_divergente"; Valor = $typeMismatches.Count; Status = if ($typeMismatches.Count -eq 0) { "ok" } else { "revisar" }; Observacao = "Comparação com as regex de geo_analysis.py" }
     [pscustomobject]@{ Metrica = "coordenadas_validas"; Valor = $validCoords.Count; Status = "info"; Observacao = "Latitude e longitude numéricas" }
     [pscustomobject]@{ Metrica = "coordenada_dominante"; Valor = $dominantCoordinateCount; Status = if ($dominantCoordinateCount -eq 0) { "ok" } else { "revisar" }; Observacao = "Maior coordenada repetida; o geo_analysis.py remove esse ponto antes do spatial join" }
@@ -319,7 +322,7 @@ $metricRows = @(
     [pscustomobject]@{ Metrica = "pontos_fora_do_poligono"; Valor = (@($spatialChecks | Where-Object { $_.SpatialStatus -eq "ponto_fora_do_poligono" }).Count); Status = if ((@($spatialChecks | Where-Object { $_.SpatialStatus -eq "ponto_fora_do_poligono" }).Count) -eq 0) { "ok" } else { "falha" }; Observacao = "Teste ponto-polígono para cada id_celula" }
     [pscustomobject]@{ Metrica = "turnos_divergentes"; Valor = $turnMismatches.Count; Status = if ($turnMismatches.Count -eq 0) { "ok" } else { "falha" }; Observacao = "Hora comparada com as faixas de geo_analysis.py" }
     [pscustomobject]@{ Metrica = "enderecos_residenciais_reincidentes"; Valor = (@($summary | Where-Object { $_.FrequenciaChamados -gt 1 }).Count); Status = "info"; Observacao = "Definição do relatório: TIPO_MORADIA CASA/APARTAMENTO" }
-    [pscustomobject]@{ Metrica = "enderecos_residenciais_reincidentes_normalizados"; Valor = (@($canonicalSummary | Where-Object { $_.FrequenciaChamados -gt 1 }).Count); Status = "info"; Observacao = "Mesmo cálculo com espaços internos normalizados" }
+    [pscustomobject]@{ Metrica = "enderecos_residenciais_reincidentes_normalizados"; Valor = (@($canonicalSummary | Where-Object { $_.FrequenciaChamados -gt 1 }).Count); Status = "info"; Observacao = "Mesmo cálculo com a chave sem acentos nem pontuação" }
     [pscustomobject]@{ Metrica = "maior_frequencia_chamados"; Valor = $maxFrequency; Status = "info"; Observacao = "Maior número de chamados no mesmo endereço residencial" }
     [pscustomobject]@{ Metrica = "geojson_features"; Valor = $featuresById.Count; Status = if ($duplicateGeoIds.Count -eq 0) { "ok" } else { "falha" }; Observacao = "Features e IDs únicos da grade GeoJSON" }
 )
