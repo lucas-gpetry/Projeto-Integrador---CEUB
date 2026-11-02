@@ -5,6 +5,8 @@ scipy
 unidecode
 openpyxl
 spacy
+# spaCy 3.7 importa click, que as versões atuais do typer não instalam mais.
+click
 tqdm
 geopandas
 shapely
