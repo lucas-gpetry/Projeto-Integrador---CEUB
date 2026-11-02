@@ -193,6 +193,7 @@ def _prepare_pmdf(path: Path) -> pd.DataFrame:
     # A etapa de limpeza PMDF padroniza este campo como ISO 8601 (YYYY-MM-DD HH:MM:SS).
     # Usar dayfirst=True aqui invalidaria todas as datas cujo dia é maior que 12.
     pmdf["data_analitica"] = pd.to_datetime(pmdf["data hora"], errors="coerce")
+    # Ausente = endereço não identificável; vira 0 para não contar como repetição.
     pmdf["reincidencia_endereco"] = pd.to_numeric(pmdf["reincidencia_endereco"], errors="coerce").fillna(0).astype(int)
     return pmdf
 
@@ -306,13 +307,15 @@ def _lagged_correlations(monthly: pd.DataFrame) -> pd.DataFrame:
                 "metrica": key, "rotulo": metric["rotulo"], "defasagem_meses": lag,
                 "leitura_defasagem": definition, "n_meses": stats["n"],
                 "correlacao_pearson": round(float(stats["pearson"]), 4) if pd.notna(stats["pearson"]) else np.nan,
-                "p_valor_pearson": round(float(stats["pearson_p"]), 4) if pd.notna(stats["pearson_p"]) else np.nan,
+                "p_valor_pearson": float(stats["pearson_p"]) if pd.notna(stats["pearson_p"]) else np.nan,
                 "correlacao_spearman": round(float(stats["spearman"]), 4) if pd.notna(stats["spearman"]) else np.nan,
                 "p_valor_disponivel": SCIPY_AVAILABLE,
                 "alerta_interpretacao": "Teste exploratório com 9 a 12 pontos e múltiplas defasagens; não é evidência causal.",
             })
     result = pd.DataFrame(rows)
+    # O ajuste usa os p-valores sem arredondamento; só a saída é arredondada.
     result["p_valor_pearson_ajustado_bh"] = _benjamini_hochberg(result["p_valor_pearson"])
+    result[["p_valor_pearson", "p_valor_pearson_ajustado_bh"]] = result[["p_valor_pearson", "p_valor_pearson_ajustado_bh"]].round(4)
     return result
 
 
@@ -330,11 +333,15 @@ def _seasonality_and_recurrence(pmdf_2024: pd.DataFrame, sinan_2024: pd.DataFram
         })
     sinan_repeat_yes = int(sinan_2024["OUT_VEZES"].eq(YES).sum())
     sinan_repeat_no = int(sinan_2024["OUT_VEZES"].eq(NO).sum())
+    # reincidencia_endereco = 0 marca endereço não identificável (sem quadra nem complemento).
+    endereco_valido = pmdf_2024["reincidencia_endereco"].gt(0)
+    endereco_repetido = pmdf_2024["reincidencia_endereco"].gt(1)
     recurrence_rows = [
         {
-            "fonte": "PMDF", "conceito": "repetição espacial de endereço", "numerador": int(pmdf_2024["reincidencia_endereco"].gt(1).sum()),
-            "denominador_valido": len(pmdf_2024), "percentual": round(float(pmdf_2024["reincidencia_endereco"].gt(1).mean() * 100), 2),
-            "observacao": "Contagem de ocorrências no mesmo endereço normalizado; não identifica reincidência de pessoa.",
+            "fonte": "PMDF", "conceito": "repetição espacial de endereço", "numerador": int(endereco_repetido.sum()),
+            "denominador_valido": int(endereco_valido.sum()),
+            "percentual": round(float(endereco_repetido.sum() / endereco_valido.sum() * 100), 2),
+            "observacao": "Ocorrências cujo endereço normalizado (RA, quadra e complemento) se repete; denominador exclui endereços sem quadra nem complemento. Não identifica reincidência de pessoa.",
         },
         {
             "fonte": "SINAN", "conceito": "histórico de violência relatado", "numerador": sinan_repeat_yes,
