@@ -160,11 +160,12 @@ def distribuicao_calendario(datas, chave):
     return tabela, {"qui2": qui2, "gl": len(obs) - 1, "p": p}
 
 
-def efeito_datas(datas, datas_especiais, janela_semanas=4, dias_excluidos=()):
+def efeito_datas(datas, datas_especiais, janela_semanas=4, dias_excluidos=(), outras_especiais=()):
     """Compara cada data especial com a média do mesmo dia da semana nas semanas vizinhas.
 
     O esperado de uma data é a média diária das ocorrências no mesmo dia da semana, até
-    `janela_semanas` antes e depois, excluídas as próprias datas especiais e os
+    `janela_semanas` antes e depois, excluídas as próprias datas especiais, as
+    `outras_especiais` (datas de outro conjunto, como comemorativas ao analisar feriados) e os
     `dias_excluidos` (por exemplo, um período de falha de registro). Datas especiais que
     caem em dia excluído ficam na tabela, marcadas, mas fora do total. O IC da razão usa o
     intervalo exato de Poisson para o total observado.
@@ -173,7 +174,7 @@ def efeito_datas(datas, datas_especiais, janela_semanas=4, dias_excluidos=()):
     diario = datas.value_counts().sort_index()
     todos = pd.date_range(diario.index.min(), diario.index.max(), freq="D")
     diario = diario.reindex(todos, fill_value=0)
-    especiais = {pd.Timestamp(d) for d in datas_especiais}
+    especiais = {pd.Timestamp(d) for d in datas_especiais} | {pd.Timestamp(d) for d in outras_especiais}
     excluidos = {pd.Timestamp(d) for d in dias_excluidos}
     linhas = []
     for d, nome in datas_especiais.items():

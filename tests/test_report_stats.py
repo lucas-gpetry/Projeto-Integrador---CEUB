@@ -77,6 +77,15 @@ class TestCalendario(unittest.TestCase):
         self.assertLess(ef["ic_inf"], 2.0)
         self.assertGreater(ef["ic_sup"], 2.0)
 
+    def test_data_de_outro_conjunto_fica_fora_do_esperado(self):
+        dias = pd.date_range("2024-01-01", "2024-03-31")
+        contagem = pd.Series(10, index=dias)
+        contagem[pd.Timestamp("2024-02-14")] = 20
+        contagem[pd.Timestamp("2024-02-21")] = 80  # data especial de outro conjunto, uma semana depois
+        datas = pd.Series(np.repeat(dias.values, contagem.values))
+        _, ef = rs.efeito_datas(datas, {date(2024, 2, 14): "Teste"}, outras_especiais=[date(2024, 2, 21)])
+        self.assertAlmostEqual(ef["esperado"], 10.0)
+
     def test_razao_taxas(self):
         r = rs.razao_taxas(100, 10, 50, 10)
         self.assertAlmostEqual(r["rr"], 2.0)
