@@ -71,6 +71,7 @@ from scipy import stats
 RAIZ = next(p for p in [Path.cwd(), *Path.cwd().parents] if (p / "main.py").exists())
 sys.path.insert(0, str(RAIZ / "src"))
 
+from geo_analysis import chave_endereco
 from utils import report_figures as rf
 from utils import report_stats as rs
 from utils.report_theme import set_report_theme
@@ -154,11 +155,15 @@ madrugada = matriz_hora.loc[:, 0:4].mean(axis=1)
 meia_noite_na_hora_0 = meia_noite / (df["hora"] == 0).sum()
 # Dias afetados pela lacuna de registro: a contagem diária só se recupera no fim de setembro.
 periodo_afetado = pd.date_range("2024-09-05", "2024-09-30")
-tab_fer, ef_fer = rs.efeito_datas(df["dt"], rs.FERIADOS_2024, dias_excluidos=periodo_afetado)
-tab_com, ef_com = rs.efeito_datas(df["dt"], rs.DATAS_COMEMORATIVAS_2024, dias_excluidos=periodo_afetado)
+# Nenhuma data especial (de qualquer dos dois conjuntos) entra no esperado de outra.
+todas_especiais = [*rs.FERIADOS_2024, *rs.DATAS_COMEMORATIVAS_2024]
+tab_fer, ef_fer = rs.efeito_datas(df["dt"], rs.FERIADOS_2024, dias_excluidos=periodo_afetado, outras_especiais=todas_especiais)
+tab_com, ef_com = rs.efeito_datas(df["dt"], rs.DATAS_COMEMORATIVAS_2024, dias_excluidos=periodo_afetado, outras_especiais=todas_especiais)
 # Feriado em dia útil cria um dia de convívio a mais; feriado no fim de semana, não.
-_, ef_fer_util = rs.efeito_datas(df["dt"], {d: n for d, n in rs.FERIADOS_2024.items() if d.weekday() < 5}, dias_excluidos=periodo_afetado)
-_, ef_fer_fds = rs.efeito_datas(df["dt"], {d: n for d, n in rs.FERIADOS_2024.items() if d.weekday() >= 5}, dias_excluidos=periodo_afetado)
+_, ef_fer_util = rs.efeito_datas(df["dt"], {d: n for d, n in rs.FERIADOS_2024.items() if d.weekday() < 5},
+                                 dias_excluidos=periodo_afetado, outras_especiais=todas_especiais)
+_, ef_fer_fds = rs.efeito_datas(df["dt"], {d: n for d, n in rs.FERIADOS_2024.items() if d.weekday() >= 5},
+                                dias_excluidos=periodo_afetado, outras_especiais=todas_especiais)
 
 # ---------- Formas de violência e fatores ----------
 prev_viol = pd.DataFrame([{"rotulo": r, **rs.prevalencia(df, c)} for c, r in VIOLENCIAS.items()])
@@ -168,6 +173,7 @@ alguma_violencia = df[list(VIOLENCIAS)].any(axis=1).mean()
 pares, n_tipos = rs.coocorrencia(df, list(VIOLENCIAS))
 dois_ou_mais = (n_tipos[n_tipos.index >= 2].sum()) / N
 fis_psi = pares.loc["v_fisica", "v_psicologica"]
+moral_e_psi = df.loc[df["v_moral"], "v_psicologica"].mean()
 algum_fator = df[["flag_alcool", "flag_drogas", "flag_medida_protetiva", "flag_separacao"]].any(axis=1).mean()
 menciona_descumprimento = df["historico_limpo"].fillna("").str.contains(r"\bdescumpr")
 descumpr_entre_mp = menciona_descumprimento[df["flag_medida_protetiva"]].mean()
@@ -220,15 +226,13 @@ df["encaminhado_dp"] = df["desfecho"].eq("encaminhado_dp")
 local = df["TIPO_MORADIA"].value_counts(normalize=True)
 
 # ---------- Repetição de chamados por endereço ----------
-df["chave_endereco"] = (df["cidade"].fillna("").str.upper() + " " + df["quadra"].fillna("").str.upper()
-                        + " " + df["complemento"].fillna("").str.upper())
-residencial = df[df["TIPO_MORADIA"].isin(["CASA", "APARTAMENTO"])]
+df["chave_endereco"] = chave_endereco(df["cidade"], df["quadra"], df["complemento"])
+residencial = df[df["TIPO_MORADIA"].isin(["CASA", "APARTAMENTO"]) & df["chave_endereco"].notna()]
 contagem_end = residencial["chave_endereco"].value_counts()
 recorrentes = contagem_end[contagem_end > 1]
 dist_recorrencia = recorrentes.value_counts().sort_index()
 intervalos = rs.intervalos_entre_chamados(residencial[residencial["chave_endereco"].isin(recorrentes.index)], "chave_endereco", "dt")
 retornos = intervalos[intervalos >= 1]
-ocorr_end_repetido = (df["reincidencia_endereco"] > 1).mean()
 ```
 
 # Sumário executivo {.unnumbered}
@@ -347,6 +351,11 @@ rf.barras_prevalencia(prev_viol, COLORS, "Formas de violência mencionadas no hi
 ```
 
 Ao menos uma forma de violência foi identificada em `{python} fp(alguma_violencia)` das ocorrências. As formas **se sobrepõem**: `{python} fp(dois_ou_mais)` dos registros mencionam duas ou mais, e a combinação mais frequente é física com psicológica (`{python} fn(fis_psi)` ocorrências, `{python} fp(fis_psi / N)` do total).
+
+Duas propriedades das regras pesam nessa leitura:
+
+- **Moral e psicológica compartilham termos.** "Xingar" e "xingamento" contam nas duas formas, porque a Lei nº 11.340/2006 inclui o insulto na violência psicológica (art. 7º, II) e a injúria na moral (art. 7º, V). Por isso, `{python} fp(moral_e_psi)` das ocorrências com violência moral também têm violência psicológica, e essa sobreposição é em grande parte mecânica.
+- **A violência patrimonial exige um ato de dano ou de subtração.** Objetos citados sozinhos ("abriu o portão", "bateu na porta") e "tomar" fora do sentido de subtração ("tomou conhecimento", "tomadas as providências") não contam. Uma versão anterior das regras os contava e marcava o dobro de ocorrências (29,2%). Até que haja amostra anotada manualmente, a prevalência patrimonial é a mais dependente das regras.
 
 A violência sexual (`{python} fp(pv["Sexual"])`) é residual nos registros da PMDF, em contraste com o SINAN (@sec-sinan). A violência sexual raramente motiva o acionamento da polícia ostensiva e tende a ser relatada em outros canais, como serviços de saúde e delegacias especializadas. A baixa frequência é, portanto, um traço do canal de registro, e não um indicador da sua ocorrência.
 
@@ -578,7 +587,8 @@ s_fds = s_tab_sem["categoria"].isin(["Sábado", "Domingo"])
 s_rr_fds = rs.razao_taxas(s_tab_sem.loc[s_fds, "observado"].sum(), s_tab_sem.loc[s_fds, "dias"].sum(),
                           s_tab_sem.loc[~s_fds, "observado"].sum(), s_tab_sem.loc[~s_fds, "dias"].sum())
 s_mes_max = s_tab_mes.loc[s_tab_mes["razao_obs_esp"].idxmax()]
-_, s_ef_fer_util = rs.efeito_datas(s_datas, {d: n for d, n in rs.FERIADOS_2024.items() if d.weekday() < 5}, dias_excluidos=s_dias_imputados)
+_, s_ef_fer_util = rs.efeito_datas(s_datas, {d: n for d, n in rs.FERIADOS_2024.items() if d.weekday() < 5},
+                                   dias_excluidos=s_dias_imputados, outras_especiais=todas_especiais)
 s_hora_informada = s_com_data["hora"].notna()
 s_com_hora = s_com_data[s_hora_informada & ~s_com_data["hora_padrao"] & ~s_com_data["dia_imputado"]]
 s_noite = s_com_hora["hora"].between(20, 23).mean()
@@ -862,7 +872,7 @@ A PMDF mede a repetição de endereço; o SINAN, o histórico de violência info
 # Limitações
 
 1. **Registros, não prevalência.** A base reflete a demanda que chegou à PMDF em um único ano, com a ocorrência como unidade.
-2. **Indicadores textuais.** As flags dependem do que o policial escreveu e da cobertura dos dicionários. Ainda não há amostra anotada manualmente para estimar precisão e sensibilidade das regras, e o tamanho da narrativa enviesa as associações brutas.
+2. **Indicadores textuais.** As flags dependem do que o policial escreveu e da cobertura dos dicionários. Ainda não há amostra anotada manualmente para estimar precisão e sensibilidade das regras, e o tamanho da narrativa enviesa as associações brutas. A violência patrimonial é a forma mais sensível ao desenho das regras.
 3. **Lacuna de registro.** De 06/09 a 16/09/2024 não há registros no sistema. A causa precisa ser confirmada com a PMDF.
 4. **Georreferenciamento.** Cerca de metade das ocorrências não tem coordenada utilizável, com forte desigualdade entre RAs.
 5. **Ausência de população.** Sem denominadores populacionais por RA, comparações territoriais são de volume, não de risco.
