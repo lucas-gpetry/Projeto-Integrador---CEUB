@@ -176,7 +176,8 @@ Este módulo abstrai a lógica de visualização, permitindo que os notebooks e 
 * Contém a `grade_espacial_df_LIMPA.geojson` (usada pelo modelo de Machine Learning).
 
 ### `docs/` (Artefatos Visuais)
-* `mapa_grade_preditiva.html`: Mapa coroplético interativo gerado via Folium, evidenciando as células de 500m com maior incidência criminal.
+* `mapa_1_batalhoes.html`: Mapa coroplético interativo gerado via Folium, com as células de 500 m que têm 5 ou mais ocorrências e os batalhões da PMDF.
+* `mapa_2_feminicidios.html`: Mesmo mapa, com os feminicídios agregados por RA.
 * `relatorio_final.pdf`: Versão aprovada do relatório analítico (PMDF, EDA do SINAN e integração SINAN × PMDF).
 * `sinan_pmdf_metodologia.md`: Critérios da integração SINAN × PMDF e limites de interpretação.
 

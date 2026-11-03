@@ -771,7 +771,7 @@ Para responder à pergunta **"O policiamento está onde o crime acontece?"**, o 
 
 Ao sobrepor as localizações exatas dos Batalhões da PMDF (representados como escudos azuis) à nossa grade de risco, identificamos **"Pontos Cegos"**. São áreas de densidade demográfica elevada com alta incidência criminal, mas que estão geograficamente distantes da base de prontidão mais próxima.
 
-[Ver mapa de calor](img_maps/mapa_1_batalhoes.html){.botao-mapa target="_blank"}
+[Ver mapa de calor](../../docs/mapa_1_batalhoes.html){.botao-mapa target="_blank"}
 
 ## O Cruzamento com Feminicídios
 
@@ -783,7 +783,7 @@ Para validar a eficácia da nossa clusterização de risco, cruzamos as ocorrên
 
 Isso valida empiricamente a nossa tese preditiva: **a mancha de chamados emergenciais "antecipa" a mancha do feminicídio**.
 
-[Ver mapa de calor](img_maps/mapa_crime_vs_batalhoes.html){.botao-mapa target="_blank"}
+[Ver mapa de calor](../../docs/mapa_2_feminicidios.html){.botao-mapa target="_blank"}
 
 # Conclusões e Próximos Passos
 
