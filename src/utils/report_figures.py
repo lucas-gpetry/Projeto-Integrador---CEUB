@@ -96,6 +96,44 @@ def heatmap_hora_dia(matriz, COLORS, titulo, legenda="Ocorrências por dia"):
     return fig
 
 
+def matriz_rp(tabela, linhas, colunas, COLORS, titulo, alfa=0.05, limite=2.0):
+    """Matriz fator × forma de violência com a RP ajustada em cada célula (escala divergente em log).
+
+    Só as células com p corrigido (BH) abaixo de `alfa` recebem cor: vermelho para RP > 1 e azul
+    para RP < 1, com intensidade saturando em `limite` e 1/`limite`. As demais ficam em branco
+    com o valor em cinza; "—" marca casos insuficientes para estimar.
+    """
+    from matplotlib.colors import LinearSegmentedColormap, LogNorm
+
+    cmap = LinearSegmentedColormap.from_list("rp", [COLORS["secondary"], "#FFFFFF", COLORS["primary"]])
+    norm = LogNorm(1 / limite, limite)
+    t = tabela.set_index(["exposicao", "desfecho"])
+    fig, ax = plt.subplots(figsize=(1.25 * len(colunas) + 2.8, 0.5 * len(linhas) + 1.6))
+    for i, lin in enumerate(linhas):
+        for j, col in enumerate(colunas):
+            r = t.loc[(lin, col)] if (lin, col) in t.index else None
+            rp = np.nan if r is None else r["ajustada_rp"]
+            significativa = np.isfinite(rp) and r["p_bh"] < alfa
+            # Cor clareada em 35% para o texto em tinta escura continuar legível na célula mais forte.
+            cor = cmap(norm(np.clip(rp, 1 / limite, limite))) if significativa else (1, 1, 1, 1)
+            cor = tuple(0.35 + 0.65 * c for c in cor[:3]) if significativa else cor[:3]
+            ax.add_patch(plt.Rectangle((j, i), 1, 1, facecolor=cor, edgecolor="white", linewidth=2))
+            texto = "—" if not np.isfinite(rp) else _virgula(f"{rp:.2f}")
+            ax.text(j + 0.5, i + 0.5, texto, ha="center", va="center", fontsize=9,
+                    color=COLORS["ink"] if significativa else COLORS["muted"], fontweight="bold" if significativa else "normal")
+    ax.set_xlim(0, len(colunas))
+    ax.set_ylim(len(linhas), 0)
+    ax.set_xticks(np.arange(len(colunas)) + 0.5, colunas)
+    ax.set_yticks(np.arange(len(linhas)) + 0.5, linhas)
+    ax.xaxis.tick_top()
+    ax.tick_params(axis="x", labelsize=9)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.set_title(titulo, pad=28)
+    fig.tight_layout()
+    return fig
+
+
 def barras_prevalencia(tabela, COLORS, titulo, rotulo="rotulo"):
     """Proporção por categoria com IC 95% (barras horizontais, ordenadas)."""
     t = tabela.sort_values("p")

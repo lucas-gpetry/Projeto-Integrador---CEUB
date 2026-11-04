@@ -114,6 +114,74 @@ def razao_prevalencia_mh(df, exposicao, desfecho, estrato, z=1.96):
     return {"rp": rp, "ic_inf": rp * np.exp(-z * ep), "ic_sup": rp * np.exp(z * ep)}
 
 
+def p_valor_rp(r, z=1.96):
+    """P-valor bilateral de H0: RP = 1, recuperado do IC log-simétrico de uma razão."""
+    if not np.isfinite(r["rp"]) or not np.isfinite(r["ic_inf"]):
+        return np.nan
+    ep = (np.log(r["ic_sup"]) - np.log(r["ic_inf"])) / (2 * z)
+    return 2 * stats.norm.sf(abs(np.log(r["rp"]) / ep))
+
+
+def diferenca_razoes(r1, r2, z=1.96):
+    """Razão entre duas razões independentes (r1/r2) com IC e p-valor da diferença dos logs."""
+    ep1 = (np.log(r1["ic_sup"]) - np.log(r1["ic_inf"])) / (2 * z)
+    ep2 = (np.log(r2["ic_sup"]) - np.log(r2["ic_inf"])) / (2 * z)
+    dif, ep = np.log(r1["rp"]) - np.log(r2["rp"]), np.sqrt(ep1**2 + ep2**2)
+    return {"rp": np.exp(dif), "ic_inf": np.exp(dif - z * ep), "ic_sup": np.exp(dif + z * ep),
+            "p": 2 * stats.norm.sf(abs(dif / ep))}
+
+
+def benjamini_hochberg(p):
+    """P-valores ajustados por Benjamini-Hochberg (taxa de falsas descobertas); NaN é preservado."""
+    p = pd.Series(p, dtype=float)
+    validos = p.dropna().sort_values()
+    m = len(validos)
+    if m == 0:
+        return p
+    ajustado = (validos * m / np.arange(1, m + 1))[::-1].cummin()[::-1].clip(upper=1)
+    return ajustado.reindex(p.index)
+
+
+def phi(x, y):
+    """Coeficiente phi (correlação de Pearson entre duas variáveis binárias)."""
+    x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+    if x.std() == 0 or y.std() == 0:
+        return np.nan
+    return float(np.corrcoef(x, y)[0, 1])
+
+
+def matriz_associacoes(df, exposicoes, desfechos, estrato, minimo_casos=10):
+    """Todas as combinações exposição × desfecho: phi, RP bruta, RP de Mantel-Haenszel e p ajustado.
+
+    Valores ausentes (NaN) marcam resposta inválida e saem só do par em que aparecem. Pares com
+    menos de `minimo_casos` expostos com o desfecho ficam sem estimativa. O ajuste de
+    Benjamini-Hochberg é feito sobre a matriz inteira, que é a família de testes.
+    """
+    linhas = []
+    for exp in exposicoes:
+        for out in desfechos:
+            sub = df[[exp, out, estrato]].dropna()
+            sub = sub.assign(**{exp: sub[exp].astype(bool), out: sub[out].astype(bool)})
+            b = razao_prevalencia(sub, exp, out)
+            linha = {"exposicao": exp, "desfecho": out, "n_validos": len(sub), "n_expostos": int(sub[exp].sum()),
+                     "casos_expostos": b["a"], "p_expostos": b["p_expostos"], "p_nao_expostos": b["p_nao_expostos"],
+                     "phi": phi(sub[exp], sub[out])}
+            if b["a"] < minimo_casos or b["c"] < minimo_casos:
+                linhas.append(linha)
+                continue
+            a = razao_prevalencia_mh(sub, exp, out, estrato)
+            linha.update({"bruta_rp": b["rp"], "bruta_inf": b["ic_inf"], "bruta_sup": b["ic_sup"],
+                          "ajustada_rp": a["rp"], "ajustada_inf": a["ic_inf"], "ajustada_sup": a["ic_sup"],
+                          "p_ajustada": p_valor_rp(a)})
+            linhas.append(linha)
+    tabela = pd.DataFrame(linhas)
+    for c in ["bruta_rp", "bruta_inf", "bruta_sup", "ajustada_rp", "ajustada_inf", "ajustada_sup", "p_ajustada"]:
+        if c not in tabela:
+            tabela[c] = np.nan
+    tabela["p_bh"] = benjamini_hochberg(tabela["p_ajustada"])
+    return tabela
+
+
 def lacunas_de_registro(datas_registro, minimo_dias=2):
     """Intervalos de dias consecutivos sem nenhum registro (indício de falha de sistema ou extração)."""
     dias = pd.to_datetime(datas_registro).dt.normalize()
