@@ -235,6 +235,29 @@ recorrentes = contagem_end[contagem_end > 1]
 dist_recorrencia = recorrentes.value_counts().sort_index()
 intervalos = rs.intervalos_entre_chamados(residencial[residencial["chave_endereco"].isin(recorrentes.index)], "chave_endereco", "dt")
 retornos = intervalos[intervalos >= 1]
+
+# ---------- Auditoria das flags (etapa 6 de main.py) ----------
+pasta_auditoria = RAIZ / "outputs" / "validacao_flags"
+arquivos_auditoria = {k: pasta_auditoria / v for k, v in {
+    "faixas": "faixas_por_flag.csv", "candidatos": "candidatos_fora_da_flag.csv",
+    "cenarios": "cenarios_desfecho.csv", "razoes": "razoes_desfecho_por_cenario.csv",
+}.items()}
+if not all(p.exists() for p in arquivos_auditoria.values()):
+    raise FileNotFoundError("Saídas da auditoria ausentes. Execute `python main.py` antes de renderizar este relatório.")
+faixas = pd.read_csv(arquivos_auditoria["faixas"], encoding="utf-8-sig").set_index("flag")
+candidatos_flag = pd.read_csv(arquivos_auditoria["candidatos"], encoding="utf-8-sig", dtype={"historicos_sem_flag": str}).set_index(["flag", "rotulo"])["historicos_sem_flag"]
+cenarios_desf = pd.read_csv(arquivos_auditoria["cenarios"], encoding="utf-8-sig").set_index("desfecho")
+razoes_cen = pd.read_csv(arquivos_auditoria["razoes"], encoding="utf-8-sig")
+rp_cenario = razoes_cen.pivot(index="cenario", columns="forma", values="rp")
+dependem_de_resolver = cenarios_desf.loc["resolvido_local", "sem_de_acordo"] - cenarios_desf.loc["resolvido_local", "sem_resolver"]
+
+
+def faixa_flag(flag):
+    return f'{fp(faixas.loc[flag, "prevalencia_sem_ambiguos"])} a {fp(faixas.loc[flag, "prevalencia_com_candidatos"])}'
+
+
+def candidatos_sem_flag(flag, rotulo):
+    return fn(int(candidatos_flag[flag, rotulo]))
 ```
 
 # Sumário executivo {.unnumbered}
@@ -247,6 +270,7 @@ retornos = intervalos[intervalos >= 1]
 - **A demanda é concentrada no espaço, mas os mapas são parciais.** Entre as ocorrências com coordenada válida (`{python} fp(geo.mean())` do total), `{python} fp(rs.concentracao(df["id_celula"].dropna().value_counts().values)[1]["unidades_para_50pct"] / df["id_celula"].nunique())` das células de 500 m concentram metade dos registros. A cobertura de GPS, porém, varia de `{python} fp(cobertura_ra_grandes.min(), 0)` a `{python} fp(cobertura_ra_grandes.max(), 0)` entre as RAs.
 - **O SINAN amplia o retrato.** As notificações de saúde descrevem a violência sexual contra meninas e a violência física contra mulheres adultas, em geral por parceiro. A PMDF não registra a idade da vítima, então a comparação etária entre as fontes não é possível. O padrão de fim de semana e noite se repete nas duas fontes, e o vínculo íntimo é o fator mais associado à violência de repetição (@sec-sinan-eda).
 - **A forma de violência varia mais com a idade e com o autor do que com o local.** No SINAN, física e sexual seguem sentidos opostos ao longo da idade e dependem do vínculo com o autor. Nas duas fontes, o local quase não distingue as formas (@sec-correlacoes).
+- **As flags textuais ainda não têm precisão medida.** A auditoria do dicionário aponta as mais incertas: filhos (`{python} fp(faixas.loc["flag_filhos", "prevalencia"])`, com faixa de `{python} faixa_flag("flag_filhos")`) e violência física (`{python} fp(faixas.loc["v_fisica", "prevalencia"])`, com faixa de `{python} faixa_flag("v_fisica")`). Dos `{python} fn(cenarios_desf.loc["resolvido_local", "observado"])` desfechos "resolvido no local", `{python} fn(dependem_de_resolver)` dependem do verbo "resolver" (@sec-auditoria-flags).
 - **Há uma lacuna de registro em setembro.** Não há nenhuma ocorrência registrada no sistema entre `{python} lacunas[0][0].strftime("%d/%m")` e `{python} lacunas[0][1].strftime("%d/%m")`. A queda de setembro é, portanto, um artefato de registro, e não uma redução da violência.
 
 # Dados, definições e qualidade
@@ -358,7 +382,7 @@ Ao menos uma forma de violência foi identificada em `{python} fp(alguma_violenc
 Duas propriedades das regras pesam nessa leitura:
 
 - **Moral e psicológica compartilham termos.** "Xingar" e "xingamento" contam nas duas formas, porque a Lei nº 11.340/2006 inclui o insulto na violência psicológica (art. 7º, II) e a injúria na moral (art. 7º, V). Por isso, `{python} fp(moral_e_psi)` das ocorrências com violência moral também têm violência psicológica, e essa sobreposição é em grande parte mecânica.
-- **A violência patrimonial exige um ato de dano ou de subtração.** Objetos citados sozinhos ("abriu o portão", "bateu na porta") e "tomar" fora do sentido de subtração ("tomou conhecimento", "tomadas as providências") não contam. Uma versão anterior das regras os contava e marcava o dobro de ocorrências (29,2%). Até que haja amostra anotada manualmente, a prevalência patrimonial é a mais dependente das regras.
+- **A violência patrimonial exige um ato de dano ou de subtração.** Objetos citados sozinhos ("abriu o portão", "bateu na porta") e "tomar" fora do sentido de subtração ("tomou conhecimento", "tomadas as providências") não contam. Uma versão anterior das regras os contava e marcava o dobro de ocorrências (29,2%). A mudança mostra quanto essa prevalência depende das regras, e a @sec-auditoria-flags traz a faixa atual de cada forma.
 
 A violência sexual (`{python} fp(pv["Sexual"])`) é residual nos registros da PMDF, em contraste com o SINAN (@sec-sinan). A violência sexual raramente motiva o acionamento da polícia ostensiva e tende a ser relatada em outros canais, como serviços de saúde e delegacias especializadas. A baixa frequência é, portanto, um traço do canal de registro, e não um indicador da sua ocorrência.
 
@@ -370,10 +394,11 @@ A violência sexual (`{python} fp(pv["Sexual"])`) é residual nos registros da P
 rf.barras_prevalencia(prev_fat, COLORS, "Fatores de contexto mencionados no histórico");
 ```
 
-`{python} fp(algum_fator)` das ocorrências mencionam ao menos um entre álcool, drogas, medida protetiva e separação. Duas ressalvas de leitura:
+`{python} fp(algum_fator)` das ocorrências mencionam ao menos um entre álcool, drogas, medida protetiva e separação. Três ressalvas de leitura:
 
 - **Medida protetiva** indica que a medida foi **mencionada** (vigente, solicitada ou descumprida). Só `{python} fp(descumpr_entre_mp)` dessas narrativas usam o termo "descumprimento", e a flag não deve ser lida como taxa de descumprimento.
 - **Álcool** reflete a percepção registrada pelo policial, não uma constatação clínica.
+- **Filhos** tem regra restritiva: exige possessivo ou menção ao casal. O valor subestima as menções a filhos e não deve ser usado como estimativa (@sec-auditoria-flags).
 
 ## Associações e o efeito do tamanho do texto
 
@@ -418,6 +443,8 @@ O desfecho foi inferido da narrativa:
 - **encaminhamento à delegacia:** `{python} fp(desfecho.get("encaminhado_dp", 0))`;
 - **resolução no local** (orientação ou acordo): `{python} fp(desfecho.get("resolvido_local", 0))`;
 - **não identificado:** `{python} fp(desfecho.get("nao_identificado", 0))`. Essa parcela limita a análise do desfecho.
+
+A resolução no local é a categoria mais dependente de termos ambíguos (@sec-auditoria-flags).
 
 Entre as ocorrências com desfecho identificado, e com ajuste pelo tamanho do histórico, o encaminhamento é mais frequente quando há violência física (RP = `{python} frp(rs.razao_prevalencia_mh(desfecho_identificado, "v_fisica", "encaminhado_dp", "decil_palavras"))`) ou arma branca (RP = `{python} frp(rs.razao_prevalencia_mh(desfecho_identificado, "flag_arma_branca", "encaminhado_dp", "decil_palavras"))`). Como `{python} fp(desfecho_identificado["encaminhado_dp"].mean())` dos desfechos identificados são encaminhamentos, essas razões têm pouca margem para crescer. O cruzamento de desfecho e local com as formas de violência está na @sec-correlacoes.
 
@@ -785,7 +812,7 @@ print(rs.tabela_markdown(t))
 ```
 
 - **Álcool e violência física.** A associação bruta (RP = `{python} frp_sinan_bruta("Álcool → violência física")`) cai após o ajuste por idade (RP = `{python} frp_sinan("Álcool → violência física")`), valor próximo do 1,17 encontrado por Bandiera-Paiva et al. (2026) com o SINAN de São Paulo. A estimativa ajustada da PMDF, também próxima de 1, aponta na mesma direção. Com a violência psicológica/moral, a associação desaparece (RP ajustada = `{python} frp_sinan("Álcool → violência psicológica/moral")`).
-- **Vínculo íntimo.** Ser agredida por parceiro ou ex-parceiro associa-se à violência física (RP ajustada = `{python} frp_sinan("Vínculo íntimo → violência física")`) e, sobretudo, à violência de repetição (RP ajustada = `{python} frp_sinan("Vínculo íntimo → violência de repetição")`). É a associação mais forte da base, coerente com o caráter cíclico da violência por parceiro.
+- **Vínculo íntimo.** Ser agredida por parceiro ou ex-parceiro associa-se à violência física (RP ajustada = `{python} frp_sinan("Vínculo íntimo → violência física")`) e, sobretudo, à violência de repetição (RP ajustada = `{python} frp_sinan("Vínculo íntimo → violência de repetição")`). É a associação mais forte desta tabela, coerente com o caráter cíclico da violência por parceiro.
 - **Arma de fogo e violência psicológica/moral.** A estimativa (RP ajustada = `{python} frp_sinan("Arma de fogo → violência psicológica/moral")`) tem intervalo amplo, por haver poucos casos com arma de fogo, e não permite conclusão.
 
 Como na PMDF, as associações são transversais e não autorizam leitura causal.
@@ -1057,6 +1084,7 @@ print(rs.tabela_markdown(t))
 - **Entre os desfechos identificados, as formas são mais citadas nos encaminhamentos.** As RP ajustadas vão de `{python} fn(td["ajustada_rp"].min(), 2)` a `{python} fn(td["ajustada_rp"].max(), 2)`, e a mais alta é a da violência moral.
 - **A sensibilidade não muda o quadro.** Retirar as `{python} fn(df["improcedente"].sum())` narrativas improcedentes (só `{python} fn(d_id["improcedente"].sum())` delas têm desfecho identificado) altera pouco as razões (última coluna).
 - **Desfecho e formas saem do mesmo texto.** Uma narrativa que relata encaminhamento tende a descrever mais o fato, mesmo após o ajuste. Sem amostra anotada, o resultado não mostra que a polícia encaminha mais por causa da forma de violência.
+- **Os termos da regra pesam na magnitude.** Sem os termos suspeitos do desfecho, as RP ajustadas caem para `{python} fn(rp_cenario.loc["orientacao_nao_conduz"].min(), 2)` a `{python} fn(rp_cenario.loc["orientacao_nao_conduz"].max(), 2)`, sem mudar de direção (@sec-auditoria-flags).
 
 As `{python} fn(df["v_sexual"].sum())` ocorrências com violência sexual são poucas para testar por categoria e ficaram fora dos testes.
 
@@ -1108,15 +1136,86 @@ Os nove códigos de local foram agrupados em quatro categorias, porque na forma 
 
 A forma de violência varia mais com a idade (V de até `{python} fn(fam["idade"]["v_cramer"].max(), 2)`) e com o vínculo (até `{python} fn(fam["vinculo"]["v_cramer"].max(), 2)`) do que com o local (até `{python} fn(fam["local_pmdf"]["v_cramer"].max(), 2)` na PMDF e `{python} fn(fam["local_sinan"]["v_cramer"].max(), 2)` no SINAN). Todas as medidas são transversais e não autorizam leitura causal.
 
+# Sensibilidade das flags textuais {#sec-auditoria-flags}
+
+As flags ainda não têm precisão nem sensibilidade medidas, porque a amostra anotada manualmente não foi concluída. Para dimensionar a incerteza até lá, uma auditoria automática, que gera só contagens e dispensa a leitura de narrativas, calculou dois extremos para cada flag:
+
+- **Piso:** considera falsos os positivos sustentados apenas por termos ambíguos, como "lesão" e "medo".
+- **Teto:** considera verdadeiras as menções não negadas, nos históricos sem a flag, de termos fora do dicionário ou de formas que a regra não reconheceu.
+
+A faixa não é um intervalo de confiança: mostra quanto cada prevalência depende do dicionário.
+
+## Faixa de cada flag
+
+```{python}
+#| label: tbl-faixas-flags
+#| tbl-cap: "Prevalência de cada flag e faixa de sensibilidade ao dicionário, PMDF 2024. Cobertura no pior cenário: parcela dos casos que a regra captura se todas as menções sem flag forem verdadeiras."
+#| output: asis
+nomes_flags = {**VIOLENCIAS, **FATORES}
+ordem_faixas = faixas.assign(amplitude=faixas["prevalencia_com_candidatos"] - faixas["prevalencia_sem_ambiguos"]).sort_values("amplitude", ascending=False)
+t = pd.DataFrame({
+    "Flag": [nomes_flags[f] for f in ordem_faixas.index],
+    "Observada": ordem_faixas["prevalencia"].map(fp).values,
+    "Piso": ordem_faixas["prevalencia_sem_ambiguos"].map(fp).values,
+    "Teto": ordem_faixas["prevalencia_com_candidatos"].map(fp).values,
+    "Cobertura no pior cenário": ordem_faixas["cobertura_pior_cenario"].map(lambda v: fp(v, 0)).values,
+})
+print(rs.tabela_markdown(t))
+```
+
+- **Filhos.** `{python} fn(faixas.loc["flag_filhos", "mencao_fora_do_dicionario"])` históricos citam filho, enteado ou criança sem a flag, porque a regra exige possessivo ou menção ao casal. O valor observado não deve ser usado como estimativa.
+- **Violência física.** Tem a faixa mais larga entre as formas. Sem a flag, `{python} candidatos_sem_flag("v_fisica", "agressao")` históricos citam "agressão", `{python} candidatos_sem_flag("v_fisica", "ferimento")` citam ferimentos, `{python} candidatos_sem_flag("v_fisica", "radical: agred-")` têm formas de "agredir" que a regra não reconheceu e `{python} candidatos_sem_flag("v_fisica", "vias de fato")` citam "vias de fato". No sentido oposto, `{python} fn(faixas.loc["v_fisica", "so_termos_ambiguos"])` positivos dependem só de "lesão" ou "bater". A física só fica abaixo da psicológica se o piso de uma encontrar o teto da outra (`{python} fp(faixas.loc["v_fisica", "prevalencia_sem_ambiguos"])` contra `{python} fp(faixas.loc["v_psicologica", "prevalencia_com_candidatos"])`).
+- **Violência sexual.** O nível pode dobrar, mas continua residual, e o contraste com o SINAN permanece.
+- **Arma de fogo.** `{python} candidatos_sem_flag("flag_arma_fogo", "arma sem especificar")` históricos citam arma sem especificar o tipo.
+- **Violência patrimonial.** A faixa ficou estreita depois que a correção das regras retirou os objetos citados sozinhos.
+- **Improcedência.** A regra zera no máximo `{python} fn(faixas["zerados_por_improcedencia"].max())` positivos, na violência física (`{python} fn(faixas["zerados_por_improcedencia"].max() / N * 100, 1)` ponto percentual).
+- **Tamanho do texto.** Pesa em todas as flags. A violência física vai de `{python} fp(faixas.loc["v_fisica", "taxa_decil_curto"])` no decil de narrativas mais curtas a `{python} fp(faixas.loc["v_fisica", "taxa_decil_longo"])` no mais longo, o que justifica o ajuste das razões de prevalência.
+
+## Termos do desfecho
+
+Foram simulados três cenários cumulativos: retirar "de acordo com", que a regra lê como acordo; retirar o verbo "resolver", que também pode indicar só a decisão de alguém; e tratar como resolução no local a orientação para procurar a delegacia, retirando ainda o encaminhamento a serviços de saúde.
+
+```{python}
+#| label: tbl-cenarios-desfecho
+#| tbl-colwidths: [37,19,22,22]
+#| tbl-cap: "Distribuição do desfecho em cada cenário cumulativo, PMDF 2024 (% das ocorrências)."
+#| output: asis
+nomes_cenarios = {"observado": "Regra atual", "sem_de_acordo": 'Sem "de acordo com"', "sem_resolver": 'Também sem "resolver"', "orientacao_nao_conduz": "Também sem orientação à delegacia"}
+t = pd.DataFrame({
+    "Cenário": list(nomes_cenarios.values()),
+    "Encaminhado": [fp(cenarios_desf.loc["encaminhado_dp", c] / N) for c in nomes_cenarios],
+    "Resolvido no local": [fp(cenarios_desf.loc["resolvido_local", c] / N) for c in nomes_cenarios],
+    "Não identificado": [fp(cenarios_desf.loc["nao_identificado", c] / N) for c in nomes_cenarios],
+})
+print(rs.tabela_markdown(t))
+```
+
+```{python}
+#| label: tbl-cenarios-rp
+#| tbl-cap: "RP ajustada entre encaminhamento e resolução no local em cada cenário cumulativo, PMDF 2024."
+#| output: asis
+t = pd.DataFrame({
+    "Cenário": list(nomes_cenarios.values()),
+    **{VIOLENCIAS[forma]: [fn(rp_cenario.loc[c, forma], 2) for c in nomes_cenarios] for forma in ("v_fisica", "v_psicologica", "v_moral", "v_patrimonial")},
+})
+print(rs.tabela_markdown(t))
+```
+
+- **A resolução no local é a categoria mais frágil.** Dos `{python} fn(cenarios_desf.loc["resolvido_local", "observado"])` casos, `{python} fn(dependem_de_resolver)` dependem do verbo "resolver". "De acordo com" responde só por `{python} fn(cenarios_desf.loc["resolvido_local", "observado"] - cenarios_desf.loc["resolvido_local", "sem_de_acordo"])`.
+- **O encaminhamento também pode estar inflado.** `{python} fn(cenarios_desf.loc["encaminhado_dp", "observado"] - cenarios_desf.loc["encaminhado_dp", "orientacao_nao_conduz"])` casos deixam a categoria no último cenário.
+- **As razões caem, sem mudar de direção.** As RP ajustadas vão de `{python} fn(rp_cenario.loc["observado"].min(), 2)` a `{python} fn(rp_cenario.loc["observado"].max(), 2)` na regra atual e de `{python} fn(rp_cenario.loc["orientacao_nao_conduz"].min(), 2)` a `{python} fn(rp_cenario.loc["orientacao_nao_conduz"].max(), 2)` no último cenário.
+
+Os cenários não provam erro: indicam onde a amostra anotada precisa olhar. A amostra já foi sorteada, com 300 históricos estratificados pelas flags e sobreamostragem das raras, para rotulagem por dois integrantes do grupo em planilhas locais.
+
 # Limitações
 
 1. **Registros, não prevalência.** A base reflete a demanda que chegou à PMDF em um único ano, com a ocorrência como unidade.
-2. **Indicadores textuais.** As flags dependem do que o policial escreveu e da cobertura dos dicionários. Ainda não há amostra anotada manualmente para estimar precisão e sensibilidade das regras, e o tamanho da narrativa enviesa as associações brutas. A violência patrimonial é a forma mais sensível ao desenho das regras.
+2. **Indicadores textuais.** As flags dependem do que o policial escreveu e da cobertura dos dicionários. Ainda não há amostra anotada manualmente para estimar precisão e sensibilidade das regras, e o tamanho da narrativa enviesa as associações brutas. As faixas mais largas são as de filhos e de violência física (@sec-auditoria-flags).
 3. **Lacuna de registro.** De 06/09 a 16/09/2024 não há registros no sistema. A causa precisa ser confirmada com a PMDF.
 4. **Georreferenciamento.** Cerca de metade das ocorrências não tem coordenada utilizável, com forte desigualdade entre RAs.
 5. **Ausência de população.** Sem denominadores populacionais por RA, comparações territoriais são de volume, não de risco.
 6. **SINAN.** Notificação tardia (último ano subestimado), datas de ocorrência imputadas no dia 1, hora pouco preenchida e alto percentual de ignorado em campos como álcool e motivação.
-7. **Desfecho.** Não foi identificado em `{python} fp(desfecho.get("nao_identificado", 0))` das narrativas. Ele sai do mesmo texto que as formas de violência, sem amostra anotada, e parte da associação entre os dois pode ser mecânica.
+7. **Desfecho.** Não foi identificado em `{python} fp(desfecho.get("nao_identificado", 0))` das narrativas. Ele sai do mesmo texto que as formas de violência, sem amostra anotada, e parte da associação entre os dois pode ser mecânica. A resolução no local é a categoria mais dependente de termos ambíguos.
 8. **Idade.** A PMDF não registra a idade da vítima, e toda a análise etária vem só do SINAN.
 
 # Conclusões e próximos passos
@@ -1125,12 +1224,13 @@ A forma de violência varia mais com a idade (V de até `{python} fn(fam["idade"
 - **A violência registrada é múltipla, com predomínio da física e da psicológica.** A violência sexual é quase ausente nos registros policiais e aparece no SINAN, o que reforça a complementaridade dos canais.
 - **A forma de violência varia mais com a idade e com o autor do que com o local.** No SINAN, o V chega a `{python} fn(fam["idade"]["v_cramer"].max(), 2)` com a faixa etária e a `{python} fn(fam["vinculo"]["v_cramer"].max(), 2)` com o vínculo. Com o local, fica em até `{python} fn(fam["local_sinan"]["v_cramer"].max(), 2)` no SINAN e `{python} fn(fam["local_pmdf"]["v_cramer"].max(), 2)` na PMDF.
 - **Associações extraídas de texto precisam de ajuste pelo tamanho da narrativa.** Sem ele, o álcool parece associado a todas as formas de violência. Ajustada, a associação com a violência física é próxima de nula, enquanto as com violência psicológica e moral persistem.
+- **Os níveis das flags são faixas até a rotulagem terminar.** Filhos e violência física dependem do dicionário, e a resolução no local depende em boa parte de um verbo. A violência sexual residual e a direção das associações com o desfecho se mantêm nas faixas testadas.
 - **A grade de 500 m ainda não serve como base preditiva.** Ela organiza a demanda espacialmente, mas a cobertura desigual de GPS a enviesa. Qualquer modelo deve partir das contagens por RA, que são completas, e usar a grade só nas RAs com boa cobertura.
 
 **Próximos passos priorizados:**
 
 1. Confirmar com a PMDF a lacuna de setembro e o significado da coordenada-padrão.
-2. Anotar manualmente uma amostra de históricos para medir a precisão das flags.
+2. Concluir a rotulagem da amostra de 300 históricos para medir a precisão e a sensibilidade das flags.
 3. Obter a população por RA (PDAD/IPEDF) para calcular taxas.
 4. Solicitar 2022–2023 para modelar a demanda por RA e semana com mais de um ciclo anual.
 5. Obter o tempo de resposta por ocorrência para avaliar as células de alta demanda distantes dos batalhões.

@@ -11,7 +11,7 @@
 <meta name="author" content="Felipe Teodoro">
 <meta name="author" content="José Carvalho">
 <meta name="author" content="Lucas Petry">
-<meta name="dcterms.date" content="2026-02-11">
+<meta name="dcterms.date" content="2026-03-11">
 
 <title>Relatório Analítico — Violência contra a Mulher no Distrito Federal</title>
 <style>
@@ -2226,8 +2226,13 @@ vertical-align: -.125em;
   <li><a href="#vínculo-e-local-no-sinan" id="toc-vínculo-e-local-no-sinan" class="nav-link" data-scroll-target="#vínculo-e-local-no-sinan"><span class="header-section-number">10.3</span> Vínculo e local no SINAN</a></li>
   <li><a href="#leitura-conjunta" id="toc-leitura-conjunta" class="nav-link" data-scroll-target="#leitura-conjunta"><span class="header-section-number">10.4</span> Leitura conjunta</a></li>
   </ul></li>
-  <li><a href="#limitações" id="toc-limitações" class="nav-link" data-scroll-target="#limitações"><span class="header-section-number">11</span> Limitações</a></li>
-  <li><a href="#conclusões-e-próximos-passos" id="toc-conclusões-e-próximos-passos" class="nav-link" data-scroll-target="#conclusões-e-próximos-passos"><span class="header-section-number">12</span> Conclusões e próximos passos</a></li>
+  <li><a href="#sec-auditoria-flags" id="toc-sec-auditoria-flags" class="nav-link" data-scroll-target="#sec-auditoria-flags"><span class="header-section-number">11</span> Sensibilidade das flags textuais</a>
+  <ul class="collapse">
+  <li><a href="#faixa-de-cada-flag" id="toc-faixa-de-cada-flag" class="nav-link" data-scroll-target="#faixa-de-cada-flag"><span class="header-section-number">11.1</span> Faixa de cada flag</a></li>
+  <li><a href="#termos-do-desfecho" id="toc-termos-do-desfecho" class="nav-link" data-scroll-target="#termos-do-desfecho"><span class="header-section-number">11.2</span> Termos do desfecho</a></li>
+  </ul></li>
+  <li><a href="#limitações" id="toc-limitações" class="nav-link" data-scroll-target="#limitações"><span class="header-section-number">12</span> Limitações</a></li>
+  <li><a href="#conclusões-e-próximos-passos" id="toc-conclusões-e-próximos-passos" class="nav-link" data-scroll-target="#conclusões-e-próximos-passos"><span class="header-section-number">13</span> Conclusões e próximos passos</a></li>
   <li><a href="#referências" id="toc-referências" class="nav-link" data-scroll-target="#referências">Referências</a></li>
   </ul>
 <div class="quarto-alternate-formats"><h2>Outros formatos</h2><ul><li><a href="relatorio_final.pdf"><i class="bi bi-file-pdf"></i>PDF</a></li></ul></div></nav>
@@ -2258,7 +2263,7 @@ vertical-align: -.125em;
     <div>
     <div class="quarto-title-meta-heading">Data de Publicação</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">02/11/2026</p>
+      <p class="date">03/11/2026</p>
     </div>
   </div>
   
@@ -2281,6 +2286,7 @@ vertical-align: -.125em;
 <li><strong>A demanda é concentrada no espaço, mas os mapas são parciais.</strong> Entre as ocorrências com coordenada válida (53,3% do total), 16,6% das células de 500 m concentram metade dos registros. A cobertura de GPS, porém, varia de 4% a 80% entre as RAs.</li>
 <li><strong>O SINAN amplia o retrato.</strong> As notificações de saúde descrevem a violência sexual contra meninas e a violência física contra mulheres adultas, em geral por parceiro. A PMDF não registra a idade da vítima, então a comparação etária entre as fontes não é possível. O padrão de fim de semana e noite se repete nas duas fontes, e o vínculo íntimo é o fator mais associado à violência de repetição (<a href="#sec-sinan-eda" class="quarto-xref">Seção 8</a>).</li>
 <li><strong>A forma de violência varia mais com a idade e com o autor do que com o local.</strong> No SINAN, física e sexual seguem sentidos opostos ao longo da idade e dependem do vínculo com o autor. Nas duas fontes, o local quase não distingue as formas (<a href="#sec-correlacoes" class="quarto-xref">Seção 10</a>).</li>
+<li><strong>As flags textuais ainda não têm precisão medida.</strong> A auditoria do dicionário aponta as mais incertas: filhos (3,4%, com faixa de 3,0% a 25,4%) e violência física (39,6%, com faixa de 35,3% a 50,9%). Dos 1.264 desfechos “resolvido no local”, 616 dependem do verbo “resolver” (<a href="#sec-auditoria-flags" class="quarto-xref">Seção 11</a>).</li>
 <li><strong>Há uma lacuna de registro em setembro.</strong> Não há nenhuma ocorrência registrada no sistema entre 06/09 e 16/09. A queda de setembro é, portanto, um artefato de registro, e não uma redução da violência.</li>
 </ul>
 </section>
@@ -2628,7 +2634,7 @@ Figura 4: Proporção de ocorrências com menção a cada forma de violência (
 <p>Duas propriedades das regras pesam nessa leitura:</p>
 <ul>
 <li><strong>Moral e psicológica compartilham termos.</strong> “Xingar” e “xingamento” contam nas duas formas, porque a Lei nº 11.340/2006 inclui o insulto na violência psicológica (art. 7º, II) e a injúria na moral (art. 7º, V). Por isso, 86,2% das ocorrências com violência moral também têm violência psicológica, e essa sobreposição é em grande parte mecânica.</li>
-<li><strong>A violência patrimonial exige um ato de dano ou de subtração.</strong> Objetos citados sozinhos (“abriu o portão”, “bateu na porta”) e “tomar” fora do sentido de subtração (“tomou conhecimento”, “tomadas as providências”) não contam. Uma versão anterior das regras os contava e marcava o dobro de ocorrências (29,2%). Até que haja amostra anotada manualmente, a prevalência patrimonial é a mais dependente das regras.</li>
+<li><strong>A violência patrimonial exige um ato de dano ou de subtração.</strong> Objetos citados sozinhos (“abriu o portão”, “bateu na porta”) e “tomar” fora do sentido de subtração (“tomou conhecimento”, “tomadas as providências”) não contam. Uma versão anterior das regras os contava e marcava o dobro de ocorrências (29,2%). A mudança mostra quanto essa prevalência depende das regras, e a <a href="#sec-auditoria-flags" class="quarto-xref">Seção 11</a> traz a faixa atual de cada forma.</li>
 </ul>
 <p>A violência sexual (0,4%) é residual nos registros da PMDF, em contraste com o SINAN (<a href="#sec-sinan" class="quarto-xref">Seção 9</a>). A violência sexual raramente motiva o acionamento da polícia ostensiva e tende a ser relatada em outros canais, como serviços de saúde e delegacias especializadas. A baixa frequência é, portanto, um traço do canal de registro, e não um indicador da sua ocorrência.</p>
 </section>
@@ -2648,10 +2654,11 @@ Figura 5: Proporção de ocorrências com menção a cada fator de contexto, co
 </div>
 </div>
 </div>
-<p>41,9% das ocorrências mencionam ao menos um entre álcool, drogas, medida protetiva e separação. Duas ressalvas de leitura:</p>
+<p>41,9% das ocorrências mencionam ao menos um entre álcool, drogas, medida protetiva e separação. Três ressalvas de leitura:</p>
 <ul>
 <li><strong>Medida protetiva</strong> indica que a medida foi <strong>mencionada</strong> (vigente, solicitada ou descumprida). Só 13,1% dessas narrativas usam o termo “descumprimento”, e a flag não deve ser lida como taxa de descumprimento.</li>
 <li><strong>Álcool</strong> reflete a percepção registrada pelo policial, não uma constatação clínica.</li>
+<li><strong>Filhos</strong> tem regra restritiva: exige possessivo ou menção ao casal. O valor subestima as menções a filhos e não deve ser usado como estimativa (<a href="#sec-auditoria-flags" class="quarto-xref">Seção 11</a>).</li>
 </ul>
 <section id="associações-e-o-efeito-do-tamanho-do-texto" class="level2" data-number="4.1">
 <h2 data-number="4.1" class="anchored" data-anchor-id="associações-e-o-efeito-do-tamanho-do-texto"><span class="header-section-number">4.1</span> Associações e o efeito do tamanho do texto</h2>
@@ -2755,6 +2762,7 @@ Tabela 3: Razões de prevalência brutas e ajustadas pelo tamanho do histórico
 <li><strong>resolução no local</strong> (orientação ou acordo): 10,4%;</li>
 <li><strong>não identificado:</strong> 27,4%. Essa parcela limita a análise do desfecho.</li>
 </ul>
+<p>A resolução no local é a categoria mais dependente de termos ambíguos (<a href="#sec-auditoria-flags" class="quarto-xref">Seção 11</a>).</p>
 <p>Entre as ocorrências com desfecho identificado, e com ajuste pelo tamanho do histórico, o encaminhamento é mais frequente quando há violência física (RP = 1,13; IC 95%: 1,11–1,14) ou arma branca (RP = 1,11; IC 95%: 1,10–1,12). Como 85,6% dos desfechos identificados são encaminhamentos, essas razões têm pouca margem para crescer. O cruzamento de desfecho e local com as formas de violência está na <a href="#sec-correlacoes" class="quarto-xref">Seção 10</a>.</p>
 <p>Quanto ao local, obtido do endereço:</p>
 <ul>
@@ -3212,7 +3220,7 @@ Tabela 7: Razões de prevalência brutas e ajustadas por faixa etária, SINAN
 </div>
 <ul>
 <li><strong>Álcool e violência física.</strong> A associação bruta (RP = 1,38; IC 95%: 1,26–1,52) cai após o ajuste por idade (RP = 1,11; IC 95%: 1,02–1,22), valor próximo do 1,17 encontrado por Bandiera-Paiva et al. (2026) com o SINAN de São Paulo. A estimativa ajustada da PMDF, também próxima de 1, aponta na mesma direção. Com a violência psicológica/moral, a associação desaparece (RP ajustada = 1,00; IC 95%: 0,89–1,13).</li>
-<li><strong>Vínculo íntimo.</strong> Ser agredida por parceiro ou ex-parceiro associa-se à violência física (RP ajustada = 1,28; IC 95%: 1,20–1,36) e, sobretudo, à violência de repetição (RP ajustada = 2,09; IC 95%: 1,89–2,32). É a associação mais forte da base, coerente com o caráter cíclico da violência por parceiro.</li>
+<li><strong>Vínculo íntimo.</strong> Ser agredida por parceiro ou ex-parceiro associa-se à violência física (RP ajustada = 1,28; IC 95%: 1,20–1,36) e, sobretudo, à violência de repetição (RP ajustada = 2,09; IC 95%: 1,89–2,32). É a associação mais forte desta tabela, coerente com o caráter cíclico da violência por parceiro.</li>
 <li><strong>Arma de fogo e violência psicológica/moral.</strong> A estimativa (RP ajustada = 1,40; IC 95%: 0,89–2,18) tem intervalo amplo, por haver poucos casos com arma de fogo, e não permite conclusão.</li>
 </ul>
 <p>Como na PMDF, as associações são transversais e não autorizam leitura causal.</p>
@@ -3687,6 +3695,7 @@ Tabela 12: Formas de violência segundo o desfecho do atendimento, PMDF 2024 (%
 <li><strong>Entre os desfechos identificados, as formas são mais citadas nos encaminhamentos.</strong> As RP ajustadas vão de 1,82 a 3,28, e a mais alta é a da violência moral.</li>
 <li><strong>A sensibilidade não muda o quadro.</strong> Retirar as 1.045 narrativas improcedentes (só 129 delas têm desfecho identificado) altera pouco as razões (última coluna).</li>
 <li><strong>Desfecho e formas saem do mesmo texto.</strong> Uma narrativa que relata encaminhamento tende a descrever mais o fato, mesmo após o ajuste. Sem amostra anotada, o resultado não mostra que a polícia encaminha mais por causa da forma de violência.</li>
+<li><strong>Os termos da regra pesam na magnitude.</strong> Sem os termos suspeitos do desfecho, as RP ajustadas caem para 1,30 a 2,29, sem mudar de direção (<a href="#sec-auditoria-flags" class="quarto-xref">Seção 11</a>).</li>
 </ul>
 <p>As 45 ocorrências com violência sexual são poucas para testar por categoria e ficaram fora dos testes.</p>
 <div id="tbl-local-formas-pmdf" class="cell quarto-float quarto-figure quarto-figure-center anchored" data-execution_count="39">
@@ -3944,32 +3953,292 @@ Tabela 15: Formas de violência segundo o local de ocorrência, SINAN 2024 (% d
 <p>A forma de violência varia mais com a idade (V de até 0,44) e com o vínculo (até 0,39) do que com o local (até 0,05 na PMDF e 0,14 no SINAN). Todas as medidas são transversais e não autorizam leitura causal.</p>
 </section>
 </section>
-<section id="limitações" class="level1" data-number="11">
-<h1 data-number="11"><span class="header-section-number">11</span> Limitações</h1>
+<section id="sec-auditoria-flags" class="level1" data-number="11">
+<h1 data-number="11"><span class="header-section-number">11</span> Sensibilidade das flags textuais</h1>
+<p>As flags ainda não têm precisão nem sensibilidade medidas, porque a amostra anotada manualmente não foi concluída. Para dimensionar a incerteza até lá, uma auditoria automática, que gera só contagens e dispensa a leitura de narrativas, calculou dois extremos para cada flag:</p>
+<ul>
+<li><strong>Piso:</strong> considera falsos os positivos sustentados apenas por termos ambíguos, como “lesão” e “medo”.</li>
+<li><strong>Teto:</strong> considera verdadeiras as menções não negadas, nos históricos sem a flag, de termos fora do dicionário ou de formas que a regra não reconheceu.</li>
+</ul>
+<p>A faixa não é um intervalo de confiança: mostra quanto cada prevalência depende do dicionário.</p>
+<section id="faixa-de-cada-flag" class="level2" data-number="11.1">
+<h2 data-number="11.1" class="anchored" data-anchor-id="faixa-de-cada-flag"><span class="header-section-number">11.1</span> Faixa de cada flag</h2>
+<div id="tbl-faixas-flags" class="cell quarto-float quarto-figure quarto-figure-center anchored" data-execution_count="42">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-faixas-flags-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Tabela 16: Prevalência de cada flag e faixa de sensibilidade ao dicionário, PMDF 2024. Cobertura no pior cenário: parcela dos casos que a regra captura se todas as menções sem flag forem verdadeiras.
+</figcaption>
+<div aria-describedby="tbl-faixas-flags-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="cell caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 34%">
+<col style="width: 13%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 34%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Flag</th>
+<th style="text-align: right;">Observada</th>
+<th style="text-align: right;">Piso</th>
+<th style="text-align: right;">Teto</th>
+<th style="text-align: right;">Cobertura no pior cenário</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Filhos</td>
+<td style="text-align: right;">3,4%</td>
+<td style="text-align: right;">3,0%</td>
+<td style="text-align: right;">25,4%</td>
+<td style="text-align: right;">13%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Física</td>
+<td style="text-align: right;">39,6%</td>
+<td style="text-align: right;">35,3%</td>
+<td style="text-align: right;">50,9%</td>
+<td style="text-align: right;">78%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Psicológica</td>
+<td style="text-align: right;">34,6%</td>
+<td style="text-align: right;">31,4%</td>
+<td style="text-align: right;">36,6%</td>
+<td style="text-align: right;">94%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Moral</td>
+<td style="text-align: right;">14,9%</td>
+<td style="text-align: right;">13,3%</td>
+<td style="text-align: right;">18,1%</td>
+<td style="text-align: right;">83%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Separação ou ex-parceiro</td>
+<td style="text-align: right;">16,8%</td>
+<td style="text-align: right;">16,1%</td>
+<td style="text-align: right;">18,8%</td>
+<td style="text-align: right;">89%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Álcool</td>
+<td style="text-align: right;">15,9%</td>
+<td style="text-align: right;">15,7%</td>
+<td style="text-align: right;">18,2%</td>
+<td style="text-align: right;">88%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Patrimonial</td>
+<td style="text-align: right;">13,9%</td>
+<td style="text-align: right;">13,3%</td>
+<td style="text-align: right;">15,7%</td>
+<td style="text-align: right;">89%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Arma de fogo</td>
+<td style="text-align: right;">2,4%</td>
+<td style="text-align: right;">2,1%</td>
+<td style="text-align: right;">4,3%</td>
+<td style="text-align: right;">56%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Arma branca</td>
+<td style="text-align: right;">8,0%</td>
+<td style="text-align: right;">7,7%</td>
+<td style="text-align: right;">9,1%</td>
+<td style="text-align: right;">88%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sexual</td>
+<td style="text-align: right;">0,4%</td>
+<td style="text-align: right;">0,2%</td>
+<td style="text-align: right;">0,8%</td>
+<td style="text-align: right;">48%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Drogas</td>
+<td style="text-align: right;">8,3%</td>
+<td style="text-align: right;">8,3%</td>
+<td style="text-align: right;">8,6%</td>
+<td style="text-align: right;">97%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Medida protetiva (menção)</td>
+<td style="text-align: right;">14,9%</td>
+<td style="text-align: right;">14,9%</td>
+<td style="text-align: right;">15,0%</td>
+<td style="text-align: right;">99%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Tornozeleira eletrônica</td>
+<td style="text-align: right;">0,6%</td>
+<td style="text-align: right;">0,6%</td>
+<td style="text-align: right;">0,7%</td>
+<td style="text-align: right;">89%</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<ul>
+<li><strong>Filhos.</strong> 2.669 históricos citam filho, enteado ou criança sem a flag, porque a regra exige possessivo ou menção ao casal. O valor observado não deve ser usado como estimativa.</li>
+<li><strong>Violência física.</strong> Tem a faixa mais larga entre as formas. Sem a flag, 794 históricos citam “agressão”, 270 citam ferimentos, 215 têm formas de “agredir” que a regra não reconheceu e 173 citam “vias de fato”. No sentido oposto, 519 positivos dependem só de “lesão” ou “bater”. A física só fica abaixo da psicológica se o piso de uma encontrar o teto da outra (35,3% contra 36,6%).</li>
+<li><strong>Violência sexual.</strong> O nível pode dobrar, mas continua residual, e o contraste com o SINAN permanece.</li>
+<li><strong>Arma de fogo.</strong> 214 históricos citam arma sem especificar o tipo.</li>
+<li><strong>Violência patrimonial.</strong> A faixa ficou estreita depois que a correção das regras retirou os objetos citados sozinhos.</li>
+<li><strong>Improcedência.</strong> A regra zera no máximo 180 positivos, na violência física (1,5 ponto percentual).</li>
+<li><strong>Tamanho do texto.</strong> Pesa em todas as flags. A violência física vai de 6,4% no decil de narrativas mais curtas a 69,3% no mais longo, o que justifica o ajuste das razões de prevalência.</li>
+</ul>
+</section>
+<section id="termos-do-desfecho" class="level2" data-number="11.2">
+<h2 data-number="11.2" class="anchored" data-anchor-id="termos-do-desfecho"><span class="header-section-number">11.2</span> Termos do desfecho</h2>
+<p>Foram simulados três cenários cumulativos: retirar “de acordo com”, que a regra lê como acordo; retirar o verbo “resolver”, que também pode indicar só a decisão de alguém; e tratar como resolução no local a orientação para procurar a delegacia, retirando ainda o encaminhamento a serviços de saúde.</p>
+<div id="tbl-cenarios-desfecho" class="cell quarto-float quarto-figure quarto-figure-center anchored" data-tbl-colwidths="[37,19,22,22]" data-execution_count="43">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-cenarios-desfecho-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Tabela 17: Distribuição do desfecho em cada cenário cumulativo, PMDF 2024 (% das ocorrências).
+</figcaption>
+<div aria-describedby="tbl-cenarios-desfecho-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="cell caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 37%">
+<col style="width: 19%">
+<col style="width: 22%">
+<col style="width: 22%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Cenário</th>
+<th style="text-align: right;">Encaminhado</th>
+<th style="text-align: right;">Resolvido no local</th>
+<th style="text-align: right;">Não identificado</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Regra atual</td>
+<td style="text-align: right;">62,1%</td>
+<td style="text-align: right;">10,4%</td>
+<td style="text-align: right;">27,4%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sem “de acordo com”</td>
+<td style="text-align: right;">62,1%</td>
+<td style="text-align: right;">10,2%</td>
+<td style="text-align: right;">27,7%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Também sem “resolver”</td>
+<td style="text-align: right;">62,1%</td>
+<td style="text-align: right;">5,1%</td>
+<td style="text-align: right;">32,8%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Também sem orientação à delegacia</td>
+<td style="text-align: right;">58,4%</td>
+<td style="text-align: right;">8,7%</td>
+<td style="text-align: right;">33,0%</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<div id="tbl-cenarios-rp" class="cell quarto-float quarto-figure quarto-figure-center anchored" data-execution_count="44">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-cenarios-rp-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Tabela 18: RP ajustada entre encaminhamento e resolução no local em cada cenário cumulativo, PMDF 2024.
+</figcaption>
+<div aria-describedby="tbl-cenarios-rp-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="cell caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 43%">
+<col style="width: 10%">
+<col style="width: 17%">
+<col style="width: 9%">
+<col style="width: 17%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Cenário</th>
+<th style="text-align: right;">Física</th>
+<th style="text-align: right;">Psicológica</th>
+<th style="text-align: right;">Moral</th>
+<th style="text-align: right;">Patrimonial</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Regra atual</td>
+<td style="text-align: right;">1,82</td>
+<td style="text-align: right;">1,87</td>
+<td style="text-align: right;">3,28</td>
+<td style="text-align: right;">2,06</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sem “de acordo com”</td>
+<td style="text-align: right;">1,82</td>
+<td style="text-align: right;">1,90</td>
+<td style="text-align: right;">3,32</td>
+<td style="text-align: right;">2,08</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Também sem “resolver”</td>
+<td style="text-align: right;">1,71</td>
+<td style="text-align: right;">1,65</td>
+<td style="text-align: right;">2,63</td>
+<td style="text-align: right;">2,03</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Também sem orientação à delegacia</td>
+<td style="text-align: right;">1,52</td>
+<td style="text-align: right;">1,30</td>
+<td style="text-align: right;">2,29</td>
+<td style="text-align: right;">1,52</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<ul>
+<li><strong>A resolução no local é a categoria mais frágil.</strong> Dos 1.264 casos, 616 dependem do verbo “resolver”. “De acordo com” responde só por 31.</li>
+<li><strong>O encaminhamento também pode estar inflado.</strong> 454 casos deixam a categoria no último cenário.</li>
+<li><strong>As razões caem, sem mudar de direção.</strong> As RP ajustadas vão de 1,82 a 3,28 na regra atual e de 1,30 a 2,29 no último cenário.</li>
+</ul>
+<p>Os cenários não provam erro: indicam onde a amostra anotada precisa olhar. A amostra já foi sorteada, com 300 históricos estratificados pelas flags e sobreamostragem das raras, para rotulagem por dois integrantes do grupo em planilhas locais.</p>
+</section>
+</section>
+<section id="limitações" class="level1" data-number="12">
+<h1 data-number="12"><span class="header-section-number">12</span> Limitações</h1>
 <ol type="1">
 <li><strong>Registros, não prevalência.</strong> A base reflete a demanda que chegou à PMDF em um único ano, com a ocorrência como unidade.</li>
-<li><strong>Indicadores textuais.</strong> As flags dependem do que o policial escreveu e da cobertura dos dicionários. Ainda não há amostra anotada manualmente para estimar precisão e sensibilidade das regras, e o tamanho da narrativa enviesa as associações brutas. A violência patrimonial é a forma mais sensível ao desenho das regras.</li>
+<li><strong>Indicadores textuais.</strong> As flags dependem do que o policial escreveu e da cobertura dos dicionários. Ainda não há amostra anotada manualmente para estimar precisão e sensibilidade das regras, e o tamanho da narrativa enviesa as associações brutas. As faixas mais largas são as de filhos e de violência física (<a href="#sec-auditoria-flags" class="quarto-xref">Seção 11</a>).</li>
 <li><strong>Lacuna de registro.</strong> De 06/09 a 16/09/2024 não há registros no sistema. A causa precisa ser confirmada com a PMDF.</li>
 <li><strong>Georreferenciamento.</strong> Cerca de metade das ocorrências não tem coordenada utilizável, com forte desigualdade entre RAs.</li>
 <li><strong>Ausência de população.</strong> Sem denominadores populacionais por RA, comparações territoriais são de volume, não de risco.</li>
 <li><strong>SINAN.</strong> Notificação tardia (último ano subestimado), datas de ocorrência imputadas no dia 1, hora pouco preenchida e alto percentual de ignorado em campos como álcool e motivação.</li>
-<li><strong>Desfecho.</strong> Não foi identificado em 27,4% das narrativas. Ele sai do mesmo texto que as formas de violência, sem amostra anotada, e parte da associação entre os dois pode ser mecânica.</li>
+<li><strong>Desfecho.</strong> Não foi identificado em 27,4% das narrativas. Ele sai do mesmo texto que as formas de violência, sem amostra anotada, e parte da associação entre os dois pode ser mecânica. A resolução no local é a categoria mais dependente de termos ambíguos.</li>
 <li><strong>Idade.</strong> A PMDF não registra a idade da vítima, e toda a análise etária vem só do SINAN.</li>
 </ol>
 </section>
-<section id="conclusões-e-próximos-passos" class="level1" data-number="12">
-<h1 data-number="12"><span class="header-section-number">12</span> Conclusões e próximos passos</h1>
+<section id="conclusões-e-próximos-passos" class="level1" data-number="13">
+<h1 data-number="13"><span class="header-section-number">13</span> Conclusões e próximos passos</h1>
 <ul>
 <li><strong>A demanda tem padrão temporal claro.</strong> Concentra-se nas noites e nos fins de semana e cresce nos feriados que caem em dias úteis. É informação diretamente utilizável no planejamento de escalas.</li>
 <li><strong>A violência registrada é múltipla, com predomínio da física e da psicológica.</strong> A violência sexual é quase ausente nos registros policiais e aparece no SINAN, o que reforça a complementaridade dos canais.</li>
 <li><strong>A forma de violência varia mais com a idade e com o autor do que com o local.</strong> No SINAN, o V chega a 0,44 com a faixa etária e a 0,39 com o vínculo. Com o local, fica em até 0,14 no SINAN e 0,05 na PMDF.</li>
 <li><strong>Associações extraídas de texto precisam de ajuste pelo tamanho da narrativa.</strong> Sem ele, o álcool parece associado a todas as formas de violência. Ajustada, a associação com a violência física é próxima de nula, enquanto as com violência psicológica e moral persistem.</li>
+<li><strong>Os níveis das flags são faixas até a rotulagem terminar.</strong> Filhos e violência física dependem do dicionário, e a resolução no local depende em boa parte de um verbo. A violência sexual residual e a direção das associações com o desfecho se mantêm nas faixas testadas.</li>
 <li><strong>A grade de 500 m ainda não serve como base preditiva.</strong> Ela organiza a demanda espacialmente, mas a cobertura desigual de GPS a enviesa. Qualquer modelo deve partir das contagens por RA, que são completas, e usar a grade só nas RAs com boa cobertura.</li>
 </ul>
 <p><strong>Próximos passos priorizados:</strong></p>
 <ol type="1">
 <li>Confirmar com a PMDF a lacuna de setembro e o significado da coordenada-padrão.</li>
-<li>Anotar manualmente uma amostra de históricos para medir a precisão das flags.</li>
+<li>Concluir a rotulagem da amostra de 300 históricos para medir a precisão e a sensibilidade das flags.</li>
 <li>Obter a população por RA (PDAD/IPEDF) para calcular taxas.</li>
 <li>Solicitar 2022–2023 para modelar a demanda por RA e semana com mais de um ciclo anual.</li>
 <li>Obter o tempo de resposta por ocorrência para avaliar as células de alta demanda distantes dos batalhões.</li>
