@@ -13,6 +13,7 @@ outputs/reincidencia_validacao/
 outputs/agrupamentos_nlp/
 outputs/sinan_integracao/
 outputs/sinan_eda/
+outputs/agravantes/
 
 # Mac OS
 .DS_Store

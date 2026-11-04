@@ -51,6 +51,42 @@ class TestProporcoes(unittest.TestCase):
                                rs.razao_prevalencia(df, "exp", "out")["rp"])
 
 
+class TestMatrizAssociacoes(unittest.TestCase):
+    def test_p_valor_recupera_o_teste_do_log(self):
+        r = rs.razao_prevalencia(tabela_2x2(20, 100, 10, 100), "exp", "out")
+        ep = np.sqrt(1 / 20 - 1 / 100 + 1 / 10 - 1 / 100)
+        self.assertAlmostEqual(rs.p_valor_rp(r), 2 * (1 - __import__("scipy").stats.norm.cdf(np.log(2) / ep)))
+
+    def test_benjamini_hochberg_valores_de_referencia(self):
+        # Exemplo clássico: p = 0,01; 0,02; 0,03; 0,04; 0,05 -> todos 0,05 após o ajuste.
+        ajustado = rs.benjamini_hochberg([0.05, 0.01, np.nan, 0.03, 0.02, 0.04])
+        np.testing.assert_allclose(ajustado.dropna().values, [0.05] * 5)
+        self.assertTrue(np.isnan(ajustado.iloc[2]))
+        np.testing.assert_allclose(rs.benjamini_hochberg([0.01, 0.04, 0.5]).values, [0.03, 0.06, 0.5])
+
+    def test_phi_igual_a_pearson(self):
+        x, y = [1, 1, 0, 0, 1, 0], [1, 0, 0, 0, 1, 1]
+        self.assertAlmostEqual(rs.phi(x, y), np.corrcoef(x, y)[0, 1])
+        self.assertTrue(np.isnan(rs.phi([1, 1, 1], [0, 1, 0])))
+
+    def test_matriz_ignora_invalidos_por_par_e_suprime_poucos_casos(self):
+        df = tabela_2x2(20, 100, 10, 100).assign(raro=False)
+        df.loc[:4, "raro"] = True
+        df["out2"] = df["out"].astype(object)
+        df.loc[df.index[-10:], "out2"] = np.nan
+        m = rs.matriz_associacoes(df, ["exp", "raro"], ["out", "out2"], "estrato").set_index(["exposicao", "desfecho"])
+        self.assertAlmostEqual(m.loc[("exp", "out"), "ajustada_rp"], 2.0)
+        self.assertEqual(m.loc[("exp", "out2"), "n_validos"], 190)
+        self.assertTrue(np.isnan(m.loc[("raro", "out"), "ajustada_rp"]))
+        self.assertTrue(np.isnan(m.loc[("raro", "out"), "p_bh"]))
+
+    def test_diferenca_entre_razoes(self):
+        r = {"rp": 2.0, "ic_inf": 1.5, "ic_sup": 2.0 ** 2 / 1.5}
+        d = rs.diferenca_razoes(r, r)
+        self.assertAlmostEqual(d["rp"], 1.0)
+        self.assertAlmostEqual(d["p"], 1.0)
+
+
 class TestCalendario(unittest.TestCase):
     def test_lacunas_de_registro(self):
         dias = pd.Series(pd.to_datetime(["2024-01-01", "2024-01-02", "2024-01-06", "2024-01-08"]))
