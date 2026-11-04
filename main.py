@@ -6,6 +6,7 @@ from src.geo_analysis import processar_geoespacial
 from src.analysis import realizar_analise
 from scripts.agrupamentos_nlp import gerar_agrupamentos_nlp
 from src.sinan_pipeline import processar_sinan_e_integrar_pmdf
+from scripts.auditar_flags import main as auditar_flags
 
 
 # Mantém logs legíveis no terminal Windows e evita que caracteres dos módulos interrompam a esteira.
@@ -19,40 +20,44 @@ def run():
     print("PROJETO PMDF - ANÁLISE MARIA DA PENHA")
     print("="*50)
 
-    # As etapas 1 a 4 resolvem caminhos a partir do diretório atual; a 5, a partir da raiz.
+    # As etapas 1 a 4 resolvem caminhos a partir do diretório atual; a 5 e a 6, a partir da raiz.
     # Fixar a raiz evita que uma etapa leia a saída antiga de outra.
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     inicio_total = time.time()
 
     try:
         # ETAPA 1: Limpeza e Processamento Inicial 
-        print("\n[1/5] Iniciando Limpeza e Extração de Datas...")
+        print("\n[1/6] Iniciando Limpeza e Extração de Datas...")
         processar_base_completa()
         
         print("-" * 30)
 
         # ETAPA 2: Análise Geoespacial e Atributos 
-        print("[2/5] Aplicando Engenharia Geoespacial (Turnos, Moradia e Grade)...")
+        print("[2/6] Aplicando Engenharia Geoespacial (Turnos, Moradia e Grade)...")
         processar_geoespacial()
 
         print("-" * 30)
 
         # ETAPA 3: Análise com spaCy + Regex 
-        print("[3/5] Aplicando NLP...")
+        print("[3/6] Aplicando NLP...")
         realizar_analise()
 
         print("-" * 30)
 
         # ETAPA 4: Agrupamentos das categorias extraídas pelo NLP
-        print("[4/5] Gerando agrupamentos e planilhas de validação NLP...")
+        print("[4/6] Gerando agrupamentos e planilhas de validação NLP...")
         caminho_agrupamentos = gerar_agrupamentos_nlp(
             input_path=os.path.join("data", "base_analisada.csv"),
             output_dir=os.path.join("outputs", "agrupamentos_nlp"),
         )
 
         print("-" * 30)
-        print("[5/5] Tratando SINAN e integrando indicadores agregados com PMDF...")
+        print("[5/6] Tratando SINAN e integrando indicadores agregados com PMDF...")
         caminho_sinan = processar_sinan_e_integrar_pmdf()
+
+        print("-" * 30)
+        print("[6/6] Auditando o dicionário das flags textuais...")
+        auditar_flags()
 
         fim_total = time.time()
         tempo_total = (fim_total - inicio_total) / 60

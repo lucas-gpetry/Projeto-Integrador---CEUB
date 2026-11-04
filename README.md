@@ -189,12 +189,16 @@ Este módulo abstrai a lógica de visualização, permitindo que os notebooks e 
    Crie o ambiente com `python3.12 -m venv .venv` e instale as dependências: `pip install -r requirements.txt`
 2. Garanta que o arquivo `base_original_pmdf.xlsx` está na pasta `data/`.
 3. Garanta também que `violencia_mulher_DF_2010_2025.csv`, `batalhoes_pmdf.csv` e `feminicidios_pcdf.csv` estão em `data/`.
-4. Rode a esteira completa, incluindo agrupamentos NLP e integração SINAN: `python main.py`
+4. Rode a esteira completa, incluindo agrupamentos NLP, integração SINAN e auditoria das flags: `python main.py`
 5. Valide a integridade dos dados gerados: `python src/audit.py`
 6. (Opcional) Gere as tabelas e figuras avulsas da EDA do SINAN: `python src/sinan_eda.py`
 7. Renderize o relatório (HTML e PDF) a partir de `src/`, com o Python do ambiente:
    `QUARTO_PYTHON=../.venv/bin/python quarto render relatorio_final.qmd`
 8. Rode os testes: `python -m unittest discover -s tests`
+9. (Opcional) Valide as flags textuais da PMDF:
+   - `python scripts/auditar_flags.py`: refaz só a auditoria do dicionário, que já roda em `main.py` e alimenta o relatório (`outputs/validacao_flags/`, só agregados).
+   - `python scripts/amostra_padrao_ouro.py`: sorteia 300 históricos e gera uma planilha por anotador (`outputs/padrao_ouro/`, ignorado pelo Git porque tem narrativas).
+   - `python scripts/avaliar_padrao_ouro.py`: depois da rotulagem, calcula precisão, recall, F1 e kappa.
 
 ## URL do Projeto 
 

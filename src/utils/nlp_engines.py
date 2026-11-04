@@ -132,16 +132,8 @@ def _palavras(doc):
     return [unidecode(token.lower_) for token in doc]
 
 
-def extrair_flags_adicionais(doc):
-    """
-    Nova função para capturar as flags que você solicitou via spaCy.
-    """
-    resultados = {
-        'flag_separacao': False,
-        'flag_filhos': False,
-        'desfecho': 'nao_identificado'
-    }
-
+def gatilhos_adicionais(doc):
+    """Gera (chave, termo) para cada menção que sustenta filhos, separação ou desfecho."""
     text_low = unidecode(doc.text.lower())
     palavras = _palavras(doc)
 
@@ -154,26 +146,58 @@ def extrair_flags_adicionais(doc):
         if lema in LEMAS_CONTEXTO['flag_filhos']:
             possessivos = [_lema(child) for child in token.children if child.pos_ == "PRON"]
             if any(p in ['meu', 'nosso', 'dela'] for p in possessivos) or "casal" in text_low:
-                resultados['flag_filhos'] = True
+                yield 'flag_filhos', lema
 
         # 2. Separação Recente
         if palavras[token.i] == "ex" and seguintes and seguintes[0] in EX_PARCEIRO:
-            resultados['flag_separacao'] = True
+            yield 'flag_separacao', f"ex {seguintes[0]}"
         elif lema in LEMAS_CONTEXTO['flag_separacao'] and not termo_negado(palavras, token.i):
             termino_de_outra_coisa = lema in LEMAS_TERMINO and not RELACIONAMENTO.intersection(seguintes)
             separou_briga = lema == "separar" and OBJETOS_SEPARAR_BRIGA.intersection(seguintes[:2])
             # O particípio pode vir lematizado como "separar", por isso a regra olha a forma escrita.
             separado_sem_estado = palavras[token.i].startswith("separad") and not VERBOS_ESTADO.intersection(anteriores)
             if not (termino_de_outra_coisa or separou_briga or separado_sem_estado):
-                resultados['flag_separacao'] = True
+                yield 'flag_separacao', lema
 
-        # 3. Desfecho (Hierarquia: Prioriza DP sobre Local)
+        # 3. Desfecho
         if lema in LEMAS_CONTEXTO['desfecho_dp']:
-            resultados['desfecho'] = 'encaminhado_dp'
-        elif lema in LEMAS_CONTEXTO['desfecho_local'] and resultados['desfecho'] != 'encaminhado_dp':
-            resultados['desfecho'] = 'resolvido_local'
+            yield 'desfecho_dp', lema
+        elif lema in LEMAS_CONTEXTO['desfecho_local']:
+            yield 'desfecho_local', lema
 
-    return resultados
+
+def extrair_flags_adicionais(doc):
+    """Filhos, separação e desfecho; no desfecho, a menção à delegacia tem prioridade sobre a resolução no local."""
+    chaves = {chave for chave, _ in gatilhos_adicionais(doc)}
+    if 'desfecho_dp' in chaves:
+        desfecho = 'encaminhado_dp'
+    elif 'desfecho_local' in chaves:
+        desfecho = 'resolvido_local'
+    else:
+        desfecho = 'nao_identificado'
+    return {
+        'flag_separacao': 'flag_separacao' in chaves,
+        'flag_filhos': 'flag_filhos' in chaves,
+        'desfecho': desfecho,
+    }
+
+
+def mencoes_nao_negadas(pattern, texto):
+    """Gera o texto de cada ocorrência de pattern fora do escopo de uma negação."""
+    palavras = texto.split()
+    for match in re.finditer(pattern, texto, re.IGNORECASE):
+        if not termo_negado(palavras, len(texto[:match.start()].split())):
+            yield match.group(0).lower()
+
+
+def gatilhos_regex(texto):
+    """Gera (flag, termo) para cada menção não negada nos padrões de REGEX_PATTERNS."""
+    if not isinstance(texto, str) or texto == "":
+        return
+    for flag, pattern in REGEX_PATTERNS.items():
+        for termo in mencoes_nao_negadas(pattern, texto):
+            yield flag, termo
+
 
 def extrair_flags_regex(texto):
     """
@@ -181,28 +205,18 @@ def extrair_flags_regex(texto):
     Retorna um dicionário com True/False para cada flag.
     Basta uma menção não negada para ativar a flag.
     """
-    if not isinstance(texto, str) or texto == "":
-        return {key: False for key in REGEX_PATTERNS.keys()}
-
-    palavras = texto.split()
-    resultados = {}
-    for flag, pattern in REGEX_PATTERNS.items():
-        resultados[flag] = any(
-            not termo_negado(palavras, len(texto[:match.start()].split()))
-            for match in re.finditer(pattern, texto, re.IGNORECASE)
-        )
-    return resultados
+    flags = {flag for flag, _ in gatilhos_regex(texto)}
+    return {flag: flag in flags for flag in REGEX_PATTERNS}
 
 
-def extrair_tipos_spacy(doc):
-    """
-    Versão com desambiguação e filtro de improcedência.
-    """
-    resultados = {key: False for key in LEMAS_VIOLENCIA.keys()}
+def doc_improcedente(doc):
+    """Indica se o histórico traz um termo de improcedência, que zera as formas de violência."""
     texto_bruto = unidecode(doc.text.lower())
-    if any(termo in texto_bruto for termo in TERMOS_IMPROCEDENCIA):
-        return resultados
+    return any(termo in texto_bruto for termo in TERMOS_IMPROCEDENCIA)
 
+
+def gatilhos_tipos(doc):
+    """Gera (categoria, lema) para cada menção que sustenta uma forma, sem aplicar a improcedência."""
     palavras = _palavras(doc)
     lemas = [_lema(token) for token in doc]
 
@@ -242,14 +256,20 @@ def extrair_tipos_spacy(doc):
                 # 3. Tratamento Inteligente de Importunação
                 if lema in ["importunar", "importunacao"]:
                     eh_sexual = any(_lema(c) == "sexual" for c in token.children)
-                    if eh_sexual:
-                        resultados["v_sexual"] = True
-                    else:
-                        resultados["v_psicologica"] = True
+                    yield ("v_sexual" if eh_sexual else "v_psicologica"), lema
                     continue
 
-                resultados[categoria] = True
-    return resultados
+                yield categoria, lema
+
+
+def extrair_tipos_spacy(doc):
+    """
+    Versão com desambiguação e filtro de improcedência.
+    """
+    if doc_improcedente(doc):
+        return {key: False for key in LEMAS_VIOLENCIA}
+    categorias = {categoria for categoria, _ in gatilhos_tipos(doc)}
+    return {key: key in categorias for key in LEMAS_VIOLENCIA}
 
 
 def _complemento_e_bem(palavras, lemas, posicao):
