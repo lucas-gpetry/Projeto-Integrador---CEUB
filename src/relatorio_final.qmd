@@ -240,6 +240,7 @@ ocorr_end_repetido = (df["reincidencia_endereco"] > 1).mean()
 - **Parte da associação entre álcool e violência é efeito do texto.** Narrativas que citam álcool são mais longas (mediana de `{python} fn(palavras_alcool)` contra `{python} fn(palavras_sem)` palavras). Ajustada pelo tamanho do histórico, a razão de prevalência entre álcool e violência física cai de `{python} fn(rp_alc_fis_b["rp"], 2)` para `{python} fn(rp_alc_fis_a["rp"], 2)`.
 - **A demanda é concentrada no espaço, mas os mapas são parciais.** Entre as ocorrências com coordenada válida (`{python} fp(geo.mean())` do total), `{python} fp(rs.concentracao(df["id_celula"].dropna().value_counts().values)[1]["unidades_para_50pct"] / df["id_celula"].nunique())` das células de 500 m concentram metade dos registros. A cobertura de GPS, porém, varia de `{python} fp(cobertura_ra_grandes.min(), 0)` a `{python} fp(cobertura_ra_grandes.max(), 0)` entre as RAs.
 - **O SINAN amplia o retrato.** As notificações de saúde incluem violência sexual contra meninas, ausente da demanda policial, e violência física contra mulheres adultas, em geral por parceiro. O padrão de fim de semana e noite se repete nas duas fontes, e o vínculo íntimo é o fator mais associado à violência de repetição (@sec-sinan-eda).
+- **Fatores agravantes e formas de violência.** Na PMDF, armas, separação e medida protetiva associam-se à violência psicológica, e não à física. A separação ou o ex-parceiro associa-se à violência psicológica nas duas fontes, a única associação convergente. As demais divergem porque cada fonte registra um momento diferente da violência: a ameaça, na PMDF, e a lesão, no SINAN (@sec-agravantes).
 - **Há uma lacuna de registro em setembro.** Não há nenhuma ocorrência registrada no sistema entre `{python} lacunas[0][0].strftime("%d/%m")` e `{python} lacunas[0][1].strftime("%d/%m")`. A queda de setembro é, portanto, um artefato de registro, e não uma redução da violência.
 
 # Dados, definições e qualidade
@@ -859,6 +860,137 @@ print(rs.tabela_markdown(t))
 
 A PMDF mede a repetição de endereço; o SINAN, o histórico de violência informado na notificação. As métricas não se referem à mesma pessoa nem à mesma unidade e, por isso, não foram correlacionadas.
 
+# Formas de violência e fatores agravantes {#sec-agravantes}
+
+```{python}
+#| label: dados-agravantes
+from src import agravantes as ag
+
+ag_res = ag.calcular(df, sf)
+ag_pmdf = ag_res["matriz_pmdf"].set_index(["exposicao", "desfecho"], drop=False)
+ag_sinan = ag_res["matriz_sinan"].set_index(["exposicao", "desfecho"], drop=False)
+ag_dom = ag_res["matriz_sinan_domestico"].set_index(["exposicao", "desfecho"], drop=False)
+ag_comp = ag_res["comparacao_fontes"]
+ALFA = 0.05
+
+
+def frpm(m, exp, out):
+    """RP ajustada de um par da matriz, com IC, para uso entre parênteses."""
+    r = m.loc[(exp, out)]
+    return frp({"rp": r["ajustada_rp"], "ic_inf": r["ajustada_inf"], "ic_sup": r["ajustada_sup"]})
+
+
+def significativas(m):
+    return m[m["p_bh"] < ALFA]
+
+
+def contagem(m):
+    s = significativas(m)
+    return {"testes": int(m["p_bh"].notna().sum()), "sig": len(s),
+            "pos": int((s["ajustada_rp"] > 1).sum()), "neg": int((s["ajustada_rp"] < 1).sum())}
+
+
+c_pmdf, c_sinan, c_dom = contagem(ag_pmdf), contagem(ag_sinan), contagem(ag_dom)
+pmdf_fisica_pos = significativas(ag_pmdf).query("desfecho == 'Física' and ajustada_rp > 1")
+pmdf_fisica_neg = significativas(ag_pmdf).query("desfecho == 'Física' and ajustada_rp < 1")
+pmdf_nao_fisica_pos = significativas(ag_pmdf).query("desfecho in ['Psicológica', 'Moral', 'Patrimonial'] and ajustada_rp > 1")
+pmdf_maior = significativas(ag_pmdf).sort_values("ajustada_rp", ascending=False).iloc[0]
+dom_maior = significativas(ag_dom).sort_values("ajustada_rp", ascending=False).iloc[0]
+ag_comp_validos = ag_comp.dropna(subset=["pmdf_ajustada_rp", "sinan_ajustada_rp"])
+convergentes = ag_comp_validos[ag_comp_validos["direcao_pmdf"].eq(ag_comp_validos["direcao_sinan"]) & ag_comp_validos["direcao_pmdf"].isin(["+", "−"])]
+divergentes = ag_comp_validos[ag_comp_validos["p_diferenca_bh"] < ALFA]
+n_sexual_pmdf = int(df["v_sexual"].sum())
+pmdf_fisica_bruta = ag_pmdf.query("desfecho == 'Física' and bruta_inf > 1")
+sep_psi = ag_comp.set_index(["fator_pmdf", "violencia_pmdf"]).loc[("Separação ou ex-parceiro", "Psicológica ou moral")]
+sep_psi_pmdf = frp({"rp": sep_psi["pmdf_ajustada_rp"], "ic_inf": sep_psi["pmdf_ajustada_inf"], "ic_sup": sep_psi["pmdf_ajustada_sup"]})
+
+
+def lista_rotulos(m, campo="exposicao"):
+    itens = [str(v).split(" (")[0].lower() for v in m[campo]]
+    return itens[0] if len(itens) == 1 else ", ".join(itens[:-1]) + " e " + itens[-1]
+```
+
+As seções anteriores testaram associações escolhidas a partir da literatura. Esta seção as estende a **todas as combinações** entre fatores agravantes e formas de violência, em cada fonte, para responder a três perguntas: quais fatores se associam a quais formas de violência; se o padrão é o mesmo nas duas fontes; e quanto dele resiste ao ajuste pelo principal confundidor de cada base.
+
+**Método.** Para cada par fator × forma foram calculados o coeficiente phi (a correlação de Pearson entre duas variáveis binárias) e a razão de prevalência (RP), bruta e ajustada por Mantel-Haenszel: na PMDF, pelos decis do tamanho do histórico; no SINAN, pela faixa etária. A RP é a medida principal, porque o phi depende da prevalência das duas flags e fica pequeno sempre que uma delas é rara, mesmo com associação forte. Testar todas as combinações multiplica as chances de falso positivo; por isso, os p-valores das RP ajustadas foram corrigidos por Benjamini-Hochberg dentro de cada matriz, e só associações com valor corrigido abaixo de 0,05 são tratadas como sinal. Pares com menos de 10 expostos com o desfecho ficam sem estimativa. No SINAN, as proporções usam só as respostas válidas (sim ou não) de cada par.
+
+Os fatores não são idênticos nas duas fontes. Na PMDF, são flags extraídas do texto policial. No SINAN, são campos da ficha: a suspeita de álcool pelo autor, os meios de agressão (arma de fogo e objeto perfurocortante), o vínculo com ex-cônjuge ou ex-namorado(a), a violência de repetição e a deficiência ou transtorno da vítima.
+
+## PMDF
+
+```{python}
+#| label: fig-agravantes-pmdf
+#| fig-cap: "Razões de prevalência ajustadas pelo tamanho do histórico, PMDF (2024). Células coloridas: associação com p corrigido (Benjamini-Hochberg) < 0,05; vermelho para RP > 1 e azul para RP < 1. Em cinza, sem evidência; '—', casos insuficientes."
+rf.matriz_rp(ag_pmdf.reset_index(drop=True), list(ag.AGRAVANTES_PMDF.values()), list(ag.VIOLENCIAS_PMDF.values()), COLORS,
+             "Fatores agravantes × formas de violência, PMDF");
+```
+
+Das `{python} c_pmdf["testes"]` combinações estimáveis, `{python} c_pmdf["sig"]` permanecem associadas após o ajuste e a correção: `{python} c_pmdf["pos"]` positivas e `{python} c_pmdf["neg"]` negativas. O padrão principal é que **os agravantes se associam às formas não físicas de violência, e não à física**:
+
+- **Violência psicológica.** É a forma mais ligada aos agravantes. A associação mais forte da matriz é `{python} pmdf_maior["exposicao"].lower()` → `{python} pmdf_maior["desfecho"].lower()` (RP = `{python} frpm(ag_pmdf, pmdf_maior["exposicao"], pmdf_maior["desfecho"])`), seguida de separação (RP = `{python} frpm(ag_pmdf, "Separação ou ex-parceiro", "Psicológica")`), arma de fogo (RP = `{python} frpm(ag_pmdf, "Arma de fogo", "Psicológica")`) e menção a medida protetiva (RP = `{python} frpm(ag_pmdf, "Medida protetiva (menção)", "Psicológica")`). Faca e revólver aparecem nos históricos sobretudo como instrumentos de **ameaça**, e a separação, como contexto de perseguição e intimidação.
+- **Violências moral e patrimonial.** O álcool associa-se mais à violência moral (RP = `{python} frpm(ag_pmdf, "Álcool", "Moral")`) que a qualquer outra forma, padrão compatível com xingamentos e ofensas sob efeito de álcool. A separação associa-se à violência patrimonial (RP = `{python} frpm(ag_pmdf, "Separação ou ex-parceiro", "Patrimonial")`), coerente com a disputa por bens após o rompimento, e as drogas às três formas não físicas.
+- **Violência física.** `{python} "Nenhum fator" if pmdf_fisica_pos.empty else lista_rotulos(pmdf_fisica_pos).capitalize()` se associa positivamente a ela após o ajuste, e `{python} fn(len(pmdf_fisica_neg))` têm associação **negativa**: separação (RP = `{python} frpm(ag_pmdf, "Separação ou ex-parceiro", "Física")`), menção a medida protetiva (RP = `{python} frpm(ag_pmdf, "Medida protetiva (menção)", "Física")`), arma de fogo (RP = `{python} frpm(ag_pmdf, "Arma de fogo", "Física")`) e tornozeleira eletrônica (RP = `{python} frpm(ag_pmdf, "Tornozeleira eletrônica", "Física")`, com poucos casos). Essas ocorrências descrevem com mais frequência ameaça e descumprimento à distância, sem contato físico no momento do chamado.
+- **Violência sexual.** Com `{python} fn(n_sexual_pmdf)` ocorrências no ano, quase nenhum par tem casos suficientes para estimar.
+
+O ajuste pelo tamanho do histórico muda a leitura. Sem ele, `{python} lista_rotulos(pmdf_fisica_bruta)` parecem associados à violência física (RP brutas entre `{python} fn(pmdf_fisica_bruta["bruta_rp"].min(), 2)` e `{python} fn(pmdf_fisica_bruta["bruta_rp"].max(), 2)`), porque narrativas mais longas citam mais termos de todas as categorias. Os coeficientes phi brutos não passam de `{python} fn(ag_pmdf["phi"].abs().max(), 2)`, o que indica correlações fracas entre flags individuais, como se espera de indicadores binários com prevalências baixas.
+
+## SINAN
+
+```{python}
+#| label: fig-agravantes-sinan-dom
+#| fig-cap: "Razões de prevalência ajustadas por faixa etária, SINAN, recorte doméstico adulto (2024). Mesma convenção da figura anterior."
+colunas_sinan = list(ag.VIOLENCIAS_SINAN.values())
+rf.matriz_rp(ag_dom.reset_index(drop=True), list(ag.AGRAVANTES_SINAN.values()), colunas_sinan, COLORS,
+             "Fatores agravantes × formas de violência, SINAN (recorte doméstico adulto)");
+```
+
+A análise principal usa o recorte doméstico adulto (`{python} fn(len(s_dom))` notificações), o mais próximo do escopo da Lei Maria da Penha e da PMDF. Nele, `{python} c_dom["sig"]` das `{python} c_dom["testes"]` combinações estimáveis permanecem associadas:
+
+- **Álcool e violência física.** A suspeita de álcool pelo autor associa-se à violência física (RP = `{python} frpm(ag_dom, "Álcool", "Física")`), e não à psicológica/moral (RP = `{python} frpm(ag_dom, "Álcool", "Psicológica/moral")`). É o padrão inverso ao da PMDF.
+- **Ex-parceiro.** Ser agredida por ex-cônjuge ou ex-namorado(a), em comparação com os demais parceiros e familiares, associa-se à violência psicológica/moral (RP = `{python} frpm(ag_dom, "Ex-parceiro", "Psicológica/moral")`) e, com mais força, à **violência sexual** (RP = `{python} frpm(ag_dom, "Ex-parceiro", "Sexual")`), a maior associação do recorte. A violência após o rompimento inclui, portanto, uma dimensão sexual que o registro policial quase não capta.
+- **Violência de repetição.** Associa-se fortemente à violência psicológica/moral (RP = `{python} frpm(ag_dom, "Violência de repetição", "Psicológica/moral")`), mas não à física. A violência que se repete é, sobretudo, a de controle e intimidação.
+- **Objeto perfurocortante.** Associa-se à violência física (RP = `{python} frpm(ag_dom, "Perfurocortante", "Física")`) e negativamente à psicológica/moral (RP = `{python} frpm(ag_dom, "Perfurocortante", "Psicológica/moral")`). No SINAN, porém, a arma é registrada como **meio da agressão** que causou o atendimento, e a associação com a violência física é em parte definicional.
+- **Arma de fogo.** Com só `{python} fn(ag_dom.loc[("Arma de fogo", "Física"), "n_expostos"])` notificações no recorte, não há precisão para conclusões.
+
+```{python}
+#| label: fig-agravantes-sinan
+#| fig-cap: "Razões de prevalência ajustadas por faixa etária, SINAN, todas as notificações de 2024. Mesma convenção das figuras anteriores."
+rf.matriz_rp(ag_sinan.reset_index(drop=True), list(ag.AGRAVANTES_SINAN.values()), colunas_sinan, COLORS,
+             "Fatores agravantes × formas de violência, SINAN (todas as notificações)");
+```
+
+No total de notificações, que inclui crianças e agressores desconhecidos, os agravantes associam-se **negativamente** à violência sexual: a repetição (RP = `{python} frpm(ag_sinan, "Violência de repetição", "Sexual")`), o objeto perfurocortante (RP = `{python} frpm(ag_sinan, "Perfurocortante", "Sexual")`) e o ex-parceiro (RP = `{python} frpm(ag_sinan, "Ex-parceiro", "Sexual")`). Esse sinal se inverte no recorte doméstico, onde o ex-parceiro passa a se associar positivamente à violência sexual. A mudança mostra o peso da composição da base: no total, a violência sexual é dominada pelo abuso de meninas por familiares e conhecidos, e o ajuste por faixa etária não basta para separar esses contextos. Por isso, a comparação com a PMDF usa o recorte doméstico.
+
+## Convergência entre as fontes
+
+```{python}
+#| label: tbl-agravantes-comparacao
+#| tbl-cap: "Razões de prevalência ajustadas para os pares medidos nas duas fontes (PMDF × SINAN, recorte doméstico adulto, 2024). '+' e '−': associação com p corrigido < 0,05; '0': sem evidência; 'n.d.': casos insuficientes."
+#| output: asis
+def _rp_ic(rp, lo, hi):
+    return "—" if pd.isna(rp) else f"{fn(rp, 2)} ({fn(lo, 2)}–{fn(hi, 2)})"
+
+
+t = pd.DataFrame({
+    "Fator (PMDF / SINAN)": [p if p == s else f"{p} / {s}" for p, s in zip(ag_comp["fator_pmdf"], ag_comp["fator_sinan"])],
+    "Violência (PMDF / SINAN)": [p if p == s else f"{p} / {s}" for p, s in zip(ag_comp["violencia_pmdf"], ag_comp["violencia_sinan"])],
+    "PMDF": [_rp_ic(*r) for r in ag_comp[["pmdf_ajustada_rp", "pmdf_ajustada_inf", "pmdf_ajustada_sup"]].itertuples(index=False)],
+    "SINAN": [_rp_ic(*r) for r in ag_comp[["sinan_ajustada_rp", "sinan_ajustada_inf", "sinan_ajustada_sup"]].itertuples(index=False)],
+    "Direção": ag_comp["direcao_pmdf"] + " / " + ag_comp["direcao_sinan"],
+    "Diferença (p corr.)": ag_comp["p_diferenca_bh"].map(lambda p: "—" if pd.isna(p) else ("< 0,001" if p < 0.001 else fn(p, 3))),
+})
+print(rs.tabela_markdown(t))
+```
+
+Para comparar as fontes, a violência psicológica e a moral da PMDF foram unidas, porque o SINAN as registra num único campo, e a violência patrimonial foi pareada com a financeira. A coluna "Diferença" testa se as duas RP são iguais (diferença dos logaritmos, com correção de Benjamini-Hochberg entre os pares).
+
+- **Convergência.** `{python} "Nenhum par converge" if convergentes.empty else ("Só um par tem associação significativa e na mesma direção nas duas fontes" if len(convergentes) == 1 else f"{len(convergentes)} pares têm associação significativa e na mesma direção nas duas fontes")`: separação ou ex-parceiro e violência psicológica/moral (PMDF: RP = `{python} sep_psi_pmdf`; SINAN: RP = `{python} frpm(ag_dom, "Ex-parceiro", "Psicológica/moral")`). As duas estimativas `{python} "não diferem estatisticamente" if sep_psi["p_diferenca_bh"] >= ALFA else "diferem em magnitude"` (p corrigido = `{python} fn(sep_psi["p_diferenca_bh"], 2)`). É o resultado mais robusto da seção: o fim do relacionamento associa-se à violência psicológica em fontes independentes, medidas por profissionais diferentes e com instrumentos distintos.
+- **Divergência.** `{python} fn(len(divergentes))` dos `{python} fn(len(ag_comp_validos))` pares estimáveis nas duas fontes têm RP estatisticamente diferentes. A mais marcante é a arma branca: na PMDF, associa-se à violência psicológica ou moral; no SINAN, o objeto perfurocortante associa-se à física e negativamente à psicológica/moral. O álcool também troca de lado: associa-se à violência física no SINAN e às não físicas na PMDF.
+
+As divergências têm explicação no **modo de registro**, e não indicam contradição. O SINAN registra a lesão que levou a mulher a um serviço de saúde, e a arma entra na ficha como meio da agressão sofrida. A PMDF registra o chamado, muitas vezes durante a ameaça, e a arma entra na narrativa como instrumento de intimidação. O mesmo fator aparece, assim, em momentos diferentes da violência. Do mesmo modo, a suspeita de álcool no SINAN é uma pergunta da ficha (ignorada em `{python} fp(s_ctx.loc["AUTOR_ALCO", "pct_nao_informado"], 0)` das notificações), enquanto na PMDF depende de o policial mencioná-lo; o subconjunto com menção pode ser o de embriaguez mais visível, associada à agressão verbal.
+
+**Leitura dos resultados.** As associações são transversais e não autorizam leitura causal. Na PMDF, uma flag falsa significa "não identificado no texto", não "ausente"; erros das regras, ainda não medidos com amostra anotada, atenuam as associações. O ajuste pelo tamanho do histórico pode ser conservador, porque episódios graves também geram relatos longos. No SINAN, as estimativas supõem que as respostas ignoradas se distribuem como as válidas, hipótese frágil para o álcool (`{python} fp(s_ctx.loc["AUTOR_ALCO", "pct_nao_informado"])` ignorado). As matrizes completas, com phi, RP brutas e ajustadas e p-valores, são geradas por `src/agravantes.py` em `outputs/agravantes/`.
+
 # Limitações
 
 1. **Registros, não prevalência.** A base reflete a demanda que chegou à PMDF em um único ano, com a ocorrência como unidade.
@@ -874,6 +1006,7 @@ A PMDF mede a repetição de endereço; o SINAN, o histórico de violência info
 - **A demanda tem padrão temporal claro.** Concentra-se nas noites e nos fins de semana e cresce nos feriados que caem em dias úteis. É informação diretamente utilizável no planejamento de escalas.
 - **A violência registrada é múltipla, com predomínio da física e da psicológica.** A violência sexual é quase ausente nos registros policiais e aparece no SINAN, o que reforça a complementaridade dos canais.
 - **Associações extraídas de texto precisam de ajuste pelo tamanho da narrativa.** Sem ele, o álcool parece associado a todas as formas de violência. Ajustada, a associação com a violência física é próxima de nula, enquanto as com violência psicológica e moral persistem.
+- **Os agravantes registrados pela PMDF associam-se às formas não físicas de violência.** Após o ajuste, armas, separação, medida protetiva, álcool e drogas associam-se à violência psicológica, moral ou patrimonial, e nenhum fator à física. A separação ou o ex-parceiro associa-se à violência psicológica nas duas fontes, a única associação convergente; no SINAN, o ex-parceiro associa-se também à violência sexual (@sec-agravantes).
 - **A grade de 500 m ainda não serve como base preditiva.** Ela organiza a demanda espacialmente, mas a cobertura desigual de GPS a enviesa. Qualquer modelo deve partir das contagens por RA, que são completas, e usar a grade só nas RAs com boa cobertura.
 
 **Próximos passos priorizados:**
