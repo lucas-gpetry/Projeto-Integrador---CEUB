@@ -17,6 +17,7 @@ outputs/sinan_integracao/
 outputs/sinan_eda/
 outputs/validacao_flags/
 outputs/padrao_ouro/
+outputs/agravantes/
 
 # Mac OS
 .DS_Store
